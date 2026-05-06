@@ -15,8 +15,17 @@ import {
   LogOut,
   RefreshCw,
   Menu,
-  X
+  X,
+  Tag,
+  FileText,
+  Download,
+  Mail,
+  Settings as SettingsIcon,
+  BarChart3
 } from 'lucide-react'
+import AnalyticsDashboard from '../analytics/Dashboard'
+import Settings from './Settings'
+import PromoCodeManagement from './PromoCodeManagement'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8661'
 
@@ -25,6 +34,7 @@ function Dashboard() {
   const [stats, setStats] = useState(null)
   const [customers, setCustomers] = useState([])
   const [payments, setPayments] = useState([])
+  const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -40,14 +50,16 @@ function Dashboard() {
     setLoading(true)
     try {
       const config = { headers }
-      const [statsRes, custRes, payRes] = await Promise.all([
+      const [statsRes, custRes, payRes, invRes] = await Promise.all([
         axios.get(`${API_URL}/api/admin/stats`, config),
         axios.get(`${API_URL}/api/admin/customers`, config),
-        axios.get(`${API_URL}/api/admin/payments?range=all`, config)
+        axios.get(`${API_URL}/api/admin/payments?range=all`, config),
+        axios.get(`${API_URL}/api/invoices/admin/list?limit=100`, config)
       ])
       setStats(statsRes.data)
       setCustomers(custRes.data.customers)
       setPayments(payRes.data.payments)
+      setInvoices(invRes.data.invoices)
       setIsAuthorized(true)
     } catch (err) {
       if (err.response?.status === 401) {
@@ -115,9 +127,13 @@ function Dashboard() {
         </div>
 
         <nav className="space-y-0.5 flex-1">
-          <NavItem active={activeTab === 'overview'} icon={<LayoutDashboard size={14}/>} label="Overview" onClick={()=>{setActiveTab('overview'); setMobileMenuOpen(false)}} />
+          <NavItem active={activeTab === 'overview'} icon={<LayoutDashboard size={14}/>} label="Dashboard" onClick={()=>{setActiveTab('overview'); setMobileMenuOpen(false)}} />
           <NavItem active={activeTab === 'customers'} icon={<Users size={14}/>} label="Customers" onClick={()=>{setActiveTab('customers'); setMobileMenuOpen(false)}} />
           <NavItem active={activeTab === 'payments'} icon={<CreditCard size={14}/>} label="Payments" onClick={()=>{setActiveTab('payments'); setMobileMenuOpen(false)}} />
+          <NavItem active={activeTab === 'invoices'} icon={<FileText size={14}/>} label="Invoices" onClick={()=>{setActiveTab('invoices'); setMobileMenuOpen(false)}} />
+          <NavItem active={activeTab === 'analytics'} icon={<BarChart3 size={14}/>} label="Analytics" onClick={()=>{setActiveTab('analytics'); setMobileMenuOpen(false)}} />
+          <NavItem active={activeTab === 'promos'} icon={<Tag size={14}/>} label="Promo Codes" onClick={()=>{setActiveTab('promos'); setMobileMenuOpen(false)}} />
+          <NavItem active={activeTab === 'settings'} icon={<SettingsIcon size={14}/>} label="Settings" onClick={()=>{setActiveTab('settings'); setMobileMenuOpen(false)}} />
         </nav>
 
         <button onClick={() => { localStorage.removeItem('admin_token'); navigate('/'); }} className="mt-auto flex items-center gap-1.5 text-slate-400 hover:text-red-500 font-bold text-[10px] uppercase">
@@ -131,11 +147,19 @@ function Dashboard() {
           
           <header className="flex justify-between items-center mb-4">
             <h1 className="text-sm font-black text-slate-900 uppercase tracking-widest">
-              {activeTab === 'overview' ? 'Overview' : activeTab === 'customers' ? 'Customers' : 'Payments'}
+              {activeTab === 'overview' ? 'Dashboard' : 
+               activeTab === 'customers' ? 'Customers' : 
+               activeTab === 'invoices' ? 'Invoices' : 
+               activeTab === 'analytics' ? 'Analytics' :
+               activeTab === 'promos' ? 'Promo Codes' :
+               activeTab === 'settings' ? 'Settings' :
+               'Payments'}
             </h1>
-            <button onClick={() => fetchData()} className="p-1.5 bg-white border border-slate-200 rounded-md hover:bg-slate-50 shadow-sm">
-              <RefreshCw size={12} className={`text-slate-600 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            {activeTab !== 'analytics' && activeTab !== 'settings' && activeTab !== 'promos' && (
+              <button onClick={() => fetchData()} className="p-1.5 bg-white border border-slate-200 rounded-md hover:bg-slate-50 shadow-sm">
+                <RefreshCw size={12} className={`text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            )}
           </header>
 
           {activeTab === 'overview' && (
@@ -255,6 +279,110 @@ function Dashboard() {
                 </table>
               </div>
             </div>
+          )}
+
+          {activeTab === 'invoices' && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200/50 p-4">
+              <div className="overflow-x-auto text-[10px]">
+                <table className="w-full">
+                  <thead className="text-left text-slate-400 text-[9px] uppercase tracking-wider border-b border-slate-50">
+                    <tr>
+                      <th className="pb-2">Invoice #</th>
+                      <th className="pb-2">Customer</th>
+                      <th className="pb-2">Plan</th>
+                      <th className="pb-2">Amount</th>
+                      <th className="pb-2">Date</th>
+                      <th className="pb-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {invoices.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-50/50">
+                        <td className="py-2">
+                          <div className="flex items-center gap-2">
+                            <FileText size={14} className="text-indigo-600" />
+                            <span className="font-bold text-slate-700">{inv.invoice_number}</span>
+                          </div>
+                        </td>
+                        <td className="py-2 text-slate-600 text-[9px]">{inv.id.slice(0, 8)}...</td>
+                        <td className="py-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${inv.plan === 'premium' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {inv.plan}
+                          </span>
+                        </td>
+                        <td className="py-2">
+                          <div>
+                            <p className="font-black text-slate-900">₹{inv.total_amount / 100}</p>
+                            {inv.discount_amount > 0 && (
+                              <p className="text-[8px] text-emerald-600">-₹{inv.discount_amount / 100} off</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 text-slate-500">{new Date(inv.invoice_date).toLocaleDateString()}</td>
+                        <td className="py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {inv.pdf_available && (
+                              <button 
+                                onClick={async () => {
+                                  try {
+                                    const response = await axios.get(
+                                      `${API_URL}/api/invoices/admin/${inv.id}/download`,
+                                      { headers, responseType: 'blob' }
+                                    )
+                                    const url = window.URL.createObjectURL(new Blob([response.data]))
+                                    const link = document.createElement('a')
+                                    link.href = url
+                                    link.setAttribute('download', `${inv.invoice_number}.pdf`)
+                                    document.body.appendChild(link)
+                                    link.click()
+                                    link.remove()
+                                    window.URL.revokeObjectURL(url)
+                                  } catch (err) {
+                                    alert('Failed to download invoice')
+                                  }
+                                }}
+                                className="p-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100"
+                                title="Download PDF"
+                              >
+                                <Download size={12} />
+                              </button>
+                            )}
+                            <button 
+                              className={`p-1 rounded ${inv.is_emailed ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}
+                              title={inv.is_emailed ? 'Emailed' : 'Not Emailed'}
+                            >
+                              <Mail size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {invoices.length === 0 && (
+                <div className="text-center py-12">
+                  <FileText className="mx-auto text-slate-300 mb-3" size={48} />
+                  <p className="text-slate-500 font-bold text-sm">No invoices yet</p>
+                  <p className="text-slate-400 text-xs mt-1">Invoices will appear here after payments</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200/50 p-4">
+              <AnalyticsDashboard />
+            </div>
+          )}
+
+          {activeTab === 'promos' && (
+            <PromoCodeManagement />
+          )}
+
+          {activeTab === 'settings' && (
+            <Settings />
           )}
 
         </div>

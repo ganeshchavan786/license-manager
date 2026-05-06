@@ -1,4 +1,4 @@
-# Python
+# ── Python ────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
@@ -10,23 +10,27 @@ ENV/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
 
-# Database
+# ── Database ───────────────────────────────────────────────
 *.db
 *.sqlite
 *.sqlite3
+*.db.backup.*
+backups/
 
-# Environment
+# ── Environment ────────────────────────────────────────────
 .env
 .env.local
+.env.production
 
-# IDE
+# ── IDE ────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Node
+# ── Node / Frontend ────────────────────────────────────────
 node_modules/
 frontend/node_modules/
 frontend/dist/
@@ -34,11 +38,17 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS
+# ── OS ─────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Logs
+# ── Logs ───────────────────────────────────────────────────
 *.log
-logs/
+logs/*.log
+
+# ── Generated Files ────────────────────────────────────────
+invoices/*.pdf
+
+# ── Kiro ───────────────────────────────────────────────────
+.kiro/

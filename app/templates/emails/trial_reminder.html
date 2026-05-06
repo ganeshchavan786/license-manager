@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Trial is Ending Soon</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #FF9800;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border: 1px solid #ddd;
+            border-top: none;
+        }
+        .alert-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .alert-box h3 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .features {
+            background-color: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .features ul {
+            list-style: none;
+            padding: 0;
+        }
+        .features li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .features li:before {
+            content: "✓ ";
+            color: #4CAF50;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⏰ Your Trial is Ending Soon</h1>
+    </div>
+    
+    <div class="content">
+        <h2>Hi {{ owner_name }},</h2>
+        
+        <div class="alert-box">
+            <h3>Your SalaryPay trial ends in {{ days_remaining }} day{% if days_remaining != 1 %}s{% endif %}!</h3>
+            <p>Trial End Date: <strong>{{ trial_end }}</strong></p>
+        </div>
+        
+        <p>We hope you've been enjoying the powerful features of SalaryPay for managing <strong>{{ business_name }}</strong>.</p>
+        
+        <p>To continue using all the premium features without interruption, upgrade to a paid plan today!</p>
+        
+        <div class="features">
+            <h3>Premium Features You'll Keep:</h3>
+            <ul>
+                <li><strong>Face Recognition Attendance</strong> - Advanced biometric tracking</li>
+                <li><strong>Unlimited Employees</strong> - No limits on team size</li>
+                <li><strong>Full Salary Management</strong> - Complete payroll processing</li>
+                <li><strong>Tax Calculations</strong> - Automatic tax computation</li>
+                <li><strong>Loans Module</strong> - Employee loan management</li>
+                <li><strong>Export Reports</strong> - PDF and Excel exports</li>
+                <li><strong>Priority Support</strong> - Get help when you need it</li>
+            </ul>
+        </div>
+        
+        <center>
+            <a href="{{ upgrade_url }}" class="button">Upgrade Now</a>
+        </center>
+        
+        <p>Choose the plan that's right for your business:</p>
+        <ul>
+            <li><strong>Basic Plan</strong> - ₹499/month - Perfect for small teams</li>
+            <li><strong>Premium Plan</strong> - ₹999/month - Full features for growing businesses</li>
+        </ul>
+        
+        <p>Don't lose access to your data and features. Upgrade today!</p>
+        
+        <p>Best regards,<br>
+        <strong>The SalaryPay Team</strong></p>
+    </div>
+    
+    <div class="footer">
+        <p>&copy; 2024 SalaryPay. All rights reserved.</p>
+        <p>This is an automated reminder. Please do not reply to this message.</p>
+    </div>
+</body>
+</html>

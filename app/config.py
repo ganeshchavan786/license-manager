@@ -16,6 +16,21 @@ class Settings(BaseSettings):
     FREE_OFFLINE_GRACE: int = 15
     BASIC_OFFLINE_GRACE: int = 15
     PREMIUM_OFFLINE_GRACE: int = 30
+    
+    # SMTP Configuration for Email Service
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = "your-email@gmail.com"
+    SMTP_PASSWORD: str = "your-app-password"
+    SMTP_FROM_EMAIL: str = "noreply@salarypay.com"
+    SMTP_USE_TLS: bool = True
+    
+    # Frontend and Support URLs
+    FRONTEND_URL: str = "http://localhost:3000"
+    SUPPORT_EMAIL: str = "support@salarypay.com"
+    
+    # Internal API Key for cron jobs
+    INTERNAL_API_KEY: str = "internal-api-key-change-in-production"
 
     @property
     def origins_list(self) -> List[str]:

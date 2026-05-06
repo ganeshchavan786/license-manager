@@ -5,6 +5,10 @@ from app.database import get_db
 from app.models import Customer, AuditLog, AdminUser
 from app.services.auth import hash_password, verify_password, create_access_token
 from app.services.license import create_trial_license
+from app.services.email import send_welcome_email
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -82,6 +86,14 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
     )
     db.add(log)
     db.commit()
+
+    # Send welcome email (non-blocking)
+    try:
+        send_welcome_email(db, customer.id)
+        logger.info(f"Welcome email queued for customer {customer.id}")
+    except Exception as e:
+        # Log error but don't fail registration
+        logger.error(f"Failed to queue welcome email for customer {customer.id}: {str(e)}")
 
     return RegisterResponse(
         customer_id=customer.id,

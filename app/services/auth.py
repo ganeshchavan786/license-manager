@@ -40,3 +40,23 @@ def get_current_admin(token: str = Depends(oauth2_scheme)):
             headers={"WWW-Authenticate": "Bearer"},
         )
     return payload
+
+
+def get_current_customer(token: str = Depends(oauth2_scheme)):
+    """Get current authenticated customer from JWT token"""
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # Return customer_id from token payload
+    customer_id = payload.get("sub")
+    if not customer_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return customer_id

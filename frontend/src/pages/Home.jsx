@@ -60,6 +60,7 @@ function Home() {
             <a href="#about" className="hover:text-indigo-600 transition-colors">Why Us</a>
           </div>
           <div className="flex items-center gap-4">
+            <Link to="/invoices" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">My Invoices</Link>
             <Link to="/admin/login" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Admin Login</Link>
             <a href="#pricing" className="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-600 transition-all shadow-xl shadow-slate-200">View Plans</a>
           </div>

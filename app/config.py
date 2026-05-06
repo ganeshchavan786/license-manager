@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Internal API Key for cron jobs
     INTERNAL_API_KEY: str = "internal-api-key-change-in-production"
 
+    # Frontend serving toggle
+    SERVE_FRONTEND: str = "false"
+
     @property
     def origins_list(self) -> List[str]:
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]

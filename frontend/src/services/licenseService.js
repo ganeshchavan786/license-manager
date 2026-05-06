@@ -4,7 +4,7 @@
 // src/services/licenseService.js
 // ================================================================
 
-const LICENSE_SERVER = "http://localhost:8661";  // Backend API URL
+const LICENSE_SERVER = import.meta.env.VITE_API_URL || "https://licenseapi.vrushaliinfotech.com";
 const CACHE_KEY = "sp_license_cache";
 const MACHINE_ID_KEY = "sp_machine_id";
 

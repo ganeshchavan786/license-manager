@@ -54,10 +54,13 @@ app.include_router(email.router, prefix="/api")
 app.include_router(invoice.router, prefix="/api")
 app.include_router(settings_router.router)
 
-# जर 'dist' फोल्डर असेल तर ते serve करा
+# Frontend serving - फक्त SERVE_FRONTEND=true असेल तरच serve करा
+# Production मध्ये frontend वेगळ्या domain/port वर असतो
+# Development मध्ये: SERVE_FRONTEND=true uvicorn app.main:app ...
 frontend_path = os.path.join(os.getcwd(), "frontend", "dist")
+serve_frontend = os.getenv("SERVE_FRONTEND", "false").lower() == "true"
 
-if os.path.exists(frontend_path):
+if serve_frontend and os.path.exists(frontend_path):
     # सर्व static files (css, js, images) serve करण्यासाठी
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
 

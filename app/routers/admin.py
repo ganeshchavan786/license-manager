@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Customer, License, Payment, AuditLog
+from app.models import Customer, License, Payment, AuditLog, Invoice
 from app.services.license import upgrade_license
 from app.services.auth import get_current_admin
-from app.config import settings
-from datetime import datetime, timezone
+from app.config import settings, GRACE_PERIOD_DAYS, PLAN_PRICES
+from datetime import datetime, timezone, timedelta
 
 router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
 
@@ -20,11 +20,24 @@ def list_customers(
     """सर्व customers list करा"""
     customers = db.query(Customer).order_by(Customer.created_at.desc()).offset(skip).limit(limit).all()
     result = []
+    now = datetime.now(timezone.utc)
     for c in customers:
         license = db.query(License).filter(
             License.customer_id == c.id,
             License.is_active == True
         ).first()
+
+        # Days remaining calculate करा
+        days_remaining = None
+        is_expired = False
+        if license and license.valid_till:
+            vt = license.valid_till
+            if vt.tzinfo is None:
+                vt = vt.replace(tzinfo=timezone.utc)
+            delta = (vt - now).days
+            days_remaining = max(0, delta)
+            is_expired = vt < now
+
         result.append({
             "id": c.id,
             "business_name": c.business_name,
@@ -34,10 +47,114 @@ def list_customers(
             "city": c.city,
             "is_active": c.is_active,
             "plan": license.plan if license else "none",
-            "valid_till": license.valid_till.isoformat() if license else None,
+            "valid_till": license.valid_till.isoformat() if license and license.valid_till else None,
+            "trial_start": license.trial_start.isoformat() if license and license.trial_start else None,
+            "trial_end": license.trial_end.isoformat() if license and license.trial_end else None,
+            "license_start": license.created_at.isoformat() if license and license.created_at else None,
+            "days_remaining": days_remaining,
+            "is_expired": is_expired,
             "created_at": c.created_at.isoformat(),
         })
     return {"total": len(result), "customers": result}
+
+
+@router.get("/customers/{customer_id}/payments")
+def get_customer_payments(
+    customer_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """Customer चे payment history + invoices"""
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    payments = db.query(Payment).filter(
+        Payment.customer_id == customer_id
+    ).order_by(Payment.created_at.desc()).all()
+
+    result = []
+    for p in payments:
+        # Invoice शोधा या payment साठी
+        invoice = db.query(Invoice).filter(Invoice.payment_id == p.id).first()
+        result.append({
+            "id": p.id,
+            "plan": p.plan,
+            "amount": p.amount,
+            "status": p.status,
+            "razorpay_payment_id": p.razorpay_payment_id,
+            "created_at": p.created_at.isoformat(),
+            "invoice_id": invoice.id if invoice else None,
+            "invoice_number": invoice.invoice_number if invoice else None,
+            "pdf_available": bool(invoice and invoice.pdf_path) if invoice else False,
+        })
+
+    return {"payments": result, "total": len(result)}
+
+
+@router.get("/expiring-soon")
+def get_expiring_soon(
+    days: int = 7,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """X दिवसांत expire होणारे customers"""
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(days=days)
+
+    # Active paid licenses जे cutoff च्या आत expire होतील
+    expiring_licenses = db.query(License).filter(
+        License.is_active == True,
+        License.plan.in_(["trial", "basic", "premium"]),
+        License.valid_till <= cutoff,
+        License.valid_till >= now  # आधीच expired नाहीत
+    ).order_by(License.valid_till.asc()).all()
+
+    # Expired licenses (grace period मध्ये असतील)
+    expired_licenses = db.query(License).filter(
+        License.is_active == True,
+        License.plan.in_(["basic", "premium"]),
+        License.valid_till < now
+    ).order_by(License.valid_till.desc()).limit(20).all()
+
+    def build_entry(lic, is_expired_entry=False):
+        customer = db.query(Customer).filter(Customer.id == lic.customer_id).first()
+        if not customer:
+            return None
+
+        vt = lic.valid_till
+        if vt and vt.tzinfo is None:
+            vt = vt.replace(tzinfo=timezone.utc)
+
+        if is_expired_entry:
+            days_overdue = (now - vt).days if vt else 0
+            grace_days = GRACE_PERIOD_DAYS.get(lic.plan, 15)
+            grace_remaining = max(0, grace_days - days_overdue)
+        else:
+            days_remaining = (vt - now).days if vt else 0
+            grace_remaining = None
+
+        return {
+            "customer_id": customer.id,
+            "business_name": customer.business_name,
+            "email": customer.email,
+            "phone": customer.phone,
+            "plan": lic.plan,
+            "valid_till": vt.isoformat() if vt else None,
+            "days_remaining": (vt - now).days if vt and not is_expired_entry else None,
+            "is_expired": is_expired_entry,
+            "grace_remaining": grace_remaining,
+        }
+
+    expiring = [e for e in [build_entry(l) for l in expiring_licenses] if e]
+    expired = [e for e in [build_entry(l, True) for l in expired_licenses] if e]
+
+    return {
+        "expiring_soon": expiring,
+        "expired_in_grace": expired,
+        "expiring_count": len(expiring),
+        "expired_count": len(expired),
+    }
 
 
 @router.get("/customers/{customer_id}")

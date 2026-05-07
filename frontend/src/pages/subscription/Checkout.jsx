@@ -13,7 +13,12 @@ const PLAN_PRICES = {
 function Checkout() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  // URL मधून license_key safely घ्या — + signs handle करा
+  
+  // customer_id किंवा license key URL मधून घ्या
+  const customerId = searchParams.get('customer_id')
+  const plan = searchParams.get('plan') || 'basic'
+  
+  // Legacy support: key parameter असेल तर पण handle करा
   const rawKey = searchParams.get('key')
   const licenseKey = rawKey ? rawKey.replace(/ /g, '+') : null
   const plan = searchParams.get('plan') || 'basic'
@@ -83,16 +88,16 @@ function Checkout() {
   }
 
   const handlePayment = async () => {
-    if (!licenseKey) return alert("License key missing!")
+    if (!licenseKey && !customerId) return alert("License key or Customer ID missing!")
     
     setLoading(true)
     try {
-      // license_key वापरून order create करा — customer_id लागत नाही
-      const { data: order } = await axios.post(`${API_URL}/api/license/create-order`, {
-        license_key: licenseKey,
-        amount: finalAmount,
-        plan: plan
-      })
+      // customer_id असेल तर तो वापरा, नाहीतर license_key
+      const requestBody = customerId
+        ? { customer_id: customerId, amount: finalAmount, plan: plan }
+        : { license_key: licenseKey, amount: finalAmount, plan: plan }
+
+      const { data: order } = await axios.post(`${API_URL}/api/license/create-order`, requestBody)
 
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxxx',

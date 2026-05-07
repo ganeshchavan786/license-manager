@@ -55,9 +55,10 @@ from datetime import datetime, timedelta
 from app.config import settings
 
 class PaymentRequest(BaseModel):
-    license_key: str
-    amount: int  # Amount in paise (e.g. 50000 for Rs. 500)
-    plan: str = "basic"  # basic or premium
+    license_key: str = None  # Optional — customer_id असेल तर नको
+    customer_id: str = None  # Optional — license_key असेल तर नको
+    amount: int
+    plan: str = "basic"
 
 class PaymentVerify(BaseModel):
     razorpay_order_id: str
@@ -67,35 +68,45 @@ class PaymentVerify(BaseModel):
 
 @router.post("/create-order")
 def create_order(req: PaymentRequest, db: Session = Depends(get_db)):
-    """Razorpay Order तयार करतो — DB settings वापरतो"""
+    """Razorpay Order तयार करतो — customer_id किंवा license_key वापरतो"""
     from app.services.razorpay import get_razorpay_client
     from app.services.license import verify_license_key
-    
+
     client = get_razorpay_client(db)
-    
-    # URL encoding fix: spaces → + (JWT token मध्ये + signs असतात)
-    fixed_key = req.license_key.replace(" ", "+")
-    
-    # Exact match
-    license = db.query(License).filter(
-        License.license_key == fixed_key,
-        License.is_active == True
-    ).first()
-    
-    # JWT decode करून customer_id वरून शोधा
-    if not license:
-        payload = verify_license_key(fixed_key)
-        if payload:
-            customer_id = payload.get("customer_id")
-            if customer_id:
-                license = db.query(License).filter(
-                    License.customer_id == customer_id,
-                    License.is_active == True
-                ).first()
-    
+    license = None
+
+    # Option 1: customer_id directly दिला
+    if req.customer_id:
+        license = db.query(License).filter(
+            License.customer_id == req.customer_id,
+            License.is_active == True
+        ).first()
+
+    # Option 2: license_key दिली
+    if not license and req.license_key:
+        # URL encoding fix: spaces → +
+        fixed_key = req.license_key.replace(" ", "+")
+
+        # Exact match
+        license = db.query(License).filter(
+            License.license_key == fixed_key,
+            License.is_active == True
+        ).first()
+
+        # JWT decode करून customer_id वरून शोधा
+        if not license:
+            payload = verify_license_key(fixed_key)
+            if payload:
+                customer_id = payload.get("customer_id")
+                if customer_id:
+                    license = db.query(License).filter(
+                        License.customer_id == customer_id,
+                        License.is_active == True
+                    ).first()
+
     if not license:
         raise HTTPException(status_code=404, detail="License not found")
-    
+
     data = {
         "amount": req.amount,
         "currency": "INR",

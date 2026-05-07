@@ -13,7 +13,9 @@ const PLAN_PRICES = {
 function Checkout() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const licenseKey = searchParams.get('key')
+  // URL मधून license_key safely घ्या — + signs handle करा
+  const rawKey = searchParams.get('key')
+  const licenseKey = rawKey ? rawKey.replace(/ /g, '+') : null
   const plan = searchParams.get('plan') || 'basic'
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')

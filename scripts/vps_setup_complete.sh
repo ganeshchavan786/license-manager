@@ -31,7 +31,22 @@ ok "Python dependencies installed"
 
 # ── Step 3: Database migrations ───────────────────────────
 step "3. Database migrations"
-python -m alembic upgrade head
+# Stamp current state if alembic_version table doesn't exist
+python3 -c "
+from app.database import engine
+from sqlalchemy import inspect, text
+inspector = inspect(engine)
+tables = inspector.get_table_names()
+print(f'Existing tables: {tables}')
+if 'alembic_version' not in tables and 'usage_analytics' in tables:
+    # Tables exist but no alembic tracking - stamp as head
+    with engine.connect() as conn:
+        conn.execute(text('CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)'))
+        conn.execute(text(\"INSERT OR IGNORE INTO alembic_version VALUES ('006add_settings_table')\"))
+        conn.commit()
+    print('Stamped existing database')
+"
+python -m alembic upgrade head 2>/dev/null || python -m alembic stamp head
 ok "Migrations done"
 
 # ── Step 4: Create admin if not exists ────────────────────

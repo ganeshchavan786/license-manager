@@ -169,7 +169,6 @@ def validate_license(db: Session, machine_id: str, license_key: str, ip: str = N
 def upgrade_license(db: Session, customer_id: str, new_plan: str, months: int = 1) -> License:
     """Payment नंतर license upgrade करतो"""
     now = datetime.now(timezone.utc)
-    valid_till = now + timedelta(days=30 * months)
 
     license = db.query(License).filter(
         License.customer_id == customer_id,
@@ -178,6 +177,16 @@ def upgrade_license(db: Session, customer_id: str, new_plan: str, months: int = 
 
     if not license:
         return None
+
+    # Existing valid_till timezone-aware करा (SQLite timezone strip करतो)
+    existing_valid_till = license.valid_till
+    if existing_valid_till is not None and existing_valid_till.tzinfo is None:
+        existing_valid_till = existing_valid_till.replace(tzinfo=timezone.utc)
+
+    # Early renewal: existing valid_till वर stack करा
+    # Expired renewal: now पासून सुरू करा
+    base_date = max(now, existing_valid_till) if existing_valid_till else now
+    valid_till = base_date + timedelta(days=30 * months)
 
     # नवीन license key generate करा
     new_key = generate_license_key(

@@ -69,15 +69,28 @@ class PaymentVerify(BaseModel):
 def create_order(req: PaymentRequest, db: Session = Depends(get_db)):
     """Razorpay Order तयार करतो — DB settings वापरतो"""
     from app.services.razorpay import get_razorpay_client
+    from app.services.license import verify_license_key
     
     # DB मधून Razorpay client घ्या (UI मधून set केलेल्या keys)
     client = get_razorpay_client(db)
     
-    # License key वरून customer_id मिळवा
+    # License key वरून license शोधा — exact match किंवा JWT decode
     license = db.query(License).filter(
         License.license_key == req.license_key,
         License.is_active == True
     ).first()
+    
+    # Exact match नाही तर JWT decode करून customer_id वरून शोधा
+    if not license:
+        payload = verify_license_key(req.license_key)
+        if payload:
+            customer_id = payload.get("customer_id")
+            if customer_id:
+                license = db.query(License).filter(
+                    License.customer_id == customer_id,
+                    License.is_active == True
+                ).first()
+    
     if not license:
         raise HTTPException(status_code=404, detail="License not found")
     
@@ -86,9 +99,9 @@ def create_order(req: PaymentRequest, db: Session = Depends(get_db)):
         "currency": "INR",
         "receipt": f"receipt_{license.customer_id[:8]}",
         "notes": {
-            "license_key": req.license_key,
+            "license_key": license.license_key,
             "customer_id": license.customer_id,
-            "plan": req.plan if hasattr(req, 'plan') else "basic"
+            "plan": req.plan
         }
     }
     order = client.order.create(data=data)

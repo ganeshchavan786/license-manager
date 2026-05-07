@@ -57,6 +57,7 @@ from app.config import settings
 class PaymentRequest(BaseModel):
     license_key: str
     amount: int  # Amount in paise (e.g. 50000 for Rs. 500)
+    plan: str = "basic"  # basic or premium
 
 class PaymentVerify(BaseModel):
     razorpay_order_id: str
@@ -66,14 +67,29 @@ class PaymentVerify(BaseModel):
 
 @router.post("/create-order")
 def create_order(req: PaymentRequest, db: Session = Depends(get_db)):
-    """Razorpay Order तयार करतो"""
-    client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+    """Razorpay Order तयार करतो — DB settings वापरतो"""
+    from app.services.razorpay import get_razorpay_client
+    
+    # DB मधून Razorpay client घ्या (UI मधून set केलेल्या keys)
+    client = get_razorpay_client(db)
+    
+    # License key वरून customer_id मिळवा
+    license = db.query(License).filter(
+        License.license_key == req.license_key,
+        License.is_active == True
+    ).first()
+    if not license:
+        raise HTTPException(status_code=404, detail="License not found")
     
     data = {
         "amount": req.amount,
         "currency": "INR",
-        "receipt": f"receipt_{req.license_key}",
-        "notes": {"license_key": req.license_key}
+        "receipt": f"receipt_{license.customer_id[:8]}",
+        "notes": {
+            "license_key": req.license_key,
+            "customer_id": license.customer_id,
+            "plan": req.plan if hasattr(req, 'plan') else "basic"
+        }
     }
     order = client.order.create(data=data)
     return order
@@ -81,38 +97,69 @@ def create_order(req: PaymentRequest, db: Session = Depends(get_db)):
 @router.post("/verify-payment")
 def verify_payment(req: PaymentVerify, db: Session = Depends(get_db)):
     """पेमेंट तपासून लायसन्सची तारीख वाढवतो"""
-    client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
-    
-    params_dict = {
-        'razorpay_order_id': req.razorpay_order_id,
-        'razorpay_payment_id': req.razorpay_payment_id,
-        'razorpay_signature': req.razorpay_signature
-    }
-    
-    try:
-        client.utility.verify_payment_signature(params_dict)
-    except:
+    from app.services.razorpay import verify_payment_signature
+    from app.services.license import upgrade_license
+    from app.services.email import send_renewal_confirmation
+    from app.config import PLAN_PRICES
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # DB keys वापरून signature verify करा
+    is_valid = verify_payment_signature(
+        req.razorpay_order_id,
+        req.razorpay_payment_id,
+        req.razorpay_signature,
+        db=db
+    )
+    if not is_valid:
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
-    # लायसन्स शोधा आणि तारीख ३६५ दिवसांनी वाढवा
-    license = db.query(License).filter(License.license_key == req.license_key).first()
+    # License शोधा
+    license = db.query(License).filter(
+        License.license_key == req.license_key,
+        License.is_active == True
+    ).first()
     if not license:
         raise HTTPException(status_code=404, detail="License not found")
 
-    # जर ट्रायल असेल तर आजपासून ३६५ दिवस द्या, 
-    # जर आधीच प्रीमियम असेल तर जुन्या तारखेपासून ३६५ दिवस पुढे वाढवा
-    now = datetime.now()
-    base_date = license.valid_till if license.valid_till > now else now
-    license.valid_till = base_date + timedelta(days=365)
-    license.plan = "premium"
-    license.is_active = True
-    
+    # Plan determine करा — notes मधून किंवा existing plan वरून
+    plan = license.plan if license.plan in ["basic", "premium"] else "basic"
+
+    # Payment save करा
+    from app.models import Payment, AuditLog
+    payment = Payment(
+        customer_id=license.customer_id,
+        razorpay_payment_id=req.razorpay_payment_id,
+        razorpay_order_id=req.razorpay_order_id,
+        razorpay_signature=req.razorpay_signature,
+        plan=plan,
+        amount=PLAN_PRICES.get(plan, 49900),
+        status="captured"
+    )
+    db.add(payment)
     db.commit()
-    
+    db.refresh(payment)
+
+    # License upgrade करा
+    upgraded = upgrade_license(db, license.customer_id, plan)
+
+    # Renewal confirmation email
+    try:
+        send_renewal_confirmation(
+            db=db,
+            customer_id=license.customer_id,
+            plan=plan,
+            amount=PLAN_PRICES.get(plan, 49900),
+            valid_till=upgraded.valid_till
+        )
+    except Exception as e:
+        logger.error(f"Renewal email failed: {e}")
+
     return {
         "status": "success",
-        "message": "Payment verified. License extended by 365 days.",
-        "new_expiry": license.valid_till.isoformat()
+        "message": f"Payment verified. {plan.capitalize()} plan activated.",
+        "new_expiry": upgraded.valid_till.isoformat(),
+        "plan": plan
     }
 
 @router.get("/status/{machine_id}")

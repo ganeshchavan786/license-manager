@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { createPaymentOrder, verifyPayment } from '../../services/licenseService'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8661'
 
@@ -86,11 +85,12 @@ function Checkout() {
     
     setLoading(true)
     try {
-      // १. सर्व्हरवर ऑर्डर तयार करा — correct endpoint + body
-      const order = await createPaymentOrder(
-        plan,
-        promoApplied ? promoCode : null
-      )
+      // license_key वापरून order create करा — customer_id लागत नाही
+      const { data: order } = await axios.post(`${API_URL}/api/license/create-order`, {
+        license_key: licenseKey,
+        amount: finalAmount,
+        plan: plan
+      })
 
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxxx',
@@ -98,23 +98,25 @@ function Checkout() {
         currency: order.currency,
         name: "SalaryPay",
         description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
-        order_id: order.order_id,
+        order_id: order.id,
         handler: async (response) => {
-          // २. पेमेंट झाल्यावर व्हेरिफाय करा
           try {
-            const result = await verifyPayment(response, plan)
-            if (result.success) {
-              alert(`✅ Payment Successful! ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan activated.`)
+            // verify-payment ला license_key पाठवा
+            const verifyRes = await axios.post(`${API_URL}/api/license/verify-payment`, {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              license_key: licenseKey
+            })
+            if (verifyRes.data.status === 'success') {
+              alert(`✅ Payment Successful! License extended till ${new Date(verifyRes.data.new_expiry).toLocaleDateString()}`)
               navigate('/')
             }
           } catch (err) {
             alert("Payment verification failed!")
           }
         },
-        prefill: {
-          name: "Customer",
-          email: "customer@example.com",
-        },
+        prefill: { name: "Customer" },
         theme: { color: "#4f46e5" },
       }
 

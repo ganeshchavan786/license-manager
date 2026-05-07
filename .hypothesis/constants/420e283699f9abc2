@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\services\razorpay.py
+# hypothesis_version: 6.152.4
+
+['INR', 'amount', 'currency', 'customer_id', 'notes', 'plan', 'razorpay_key_id', 'razorpay_key_secret']

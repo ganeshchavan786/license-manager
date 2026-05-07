@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\services\promo.py
+# hypothesis_version: 6.152.4
+
+[100, 49900, 99900, 'Invalid promo code', 'Promo code expired', 'Promo code not found', 'base_amount', 'basic', 'code', 'discount_amount', 'discount_type', 'discount_value', 'expiry_date', 'final_amount', 'fixed', 'is_active', 'percentage', 'premium', 'promo_code_id', 'reason', 'total_discount_given', 'unique_customers', 'usage_count', 'usage_limit', 'valid']

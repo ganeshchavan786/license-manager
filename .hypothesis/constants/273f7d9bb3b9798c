@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\auth.py
+# hypothesis_version: 6.152.4
+
+[400, 401, 403, '/admin/login', '/admin/register', '/auth', '/login', '/register', 'Account is disabled', 'Authentication', 'access_token', 'bearer', 'business_name', 'customer_id', 'customer_registered', 'email', 'free', 'full_name', 'license_key', 'message', 'plan', 'role', 'sub', 'success', 'token_type', 'trial', 'unknown', 'username']

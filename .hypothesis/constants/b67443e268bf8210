@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\services\analytics.py
+# hypothesis_version: 6.152.4
+
+['Customer not found', 'customer_id', 'daily_breakdown', 'daily_usage', 'end', 'end_date', 'feature_breakdown', 'feature_stats', 'features_used', 'generated_at', 'month', 'period', 'period_days', 'start', 'start_date', 'top_features', 'total_usage', 'total_usage_count', 'unique_customers', 'usage_count', 'used', 'year']

@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\config.py
+# hypothesis_version: 6.152.4
+
+[587, 49900, 99900, '*', ',', '.env', 'HS256', 'attendance_basic', 'attendance_face', 'basic', 'employees_25', 'employees_5', 'employees_unlimited', 'export_excel', 'export_pdf', 'false', 'free', 'holidays', 'ignore', 'leaves', 'loans', 'premium', 'reports_basic', 'reports_full', 'rzp_test_xxxxxxxxxx', 'salary_basic', 'salary_full', 'smtp.gmail.com', 'tax', 'test_secret_here', 'trial', 'your-app-password', 'your-email@gmail.com']

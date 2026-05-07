@@ -13,13 +13,13 @@ module.exports = {
     // ── Backend (FastAPI + Uvicorn) ──────────────────────
     {
       name: 'salarypay-backend',
-      script: './venv/bin/uvicorn',
+      script: '/opt/license-manager/venv/bin/uvicorn',
       args: 'app.main:app --host 0.0.0.0 --port 8661 --workers 2',
-      cwd: '/var/www/salarypay',
+      cwd: '/opt/license-manager',
       interpreter: 'none',
       env: {
-        PATH: '/var/www/salarypay/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-        PYTHONPATH: '/var/www/salarypay'
+        PATH: '/opt/license-manager/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+        PYTHONPATH: '/opt/license-manager'
       },
       watch: false,
       autorestart: true,
@@ -38,7 +38,7 @@ module.exports = {
       name: 'salarypay-frontend',
       script: 'serve',
       args: '-s dist -l 3441 --no-clipboard',
-      cwd: '/var/www/salarypay/frontend',
+      cwd: '/opt/license-manager/frontend',
       interpreter: 'none',
       watch: false,
       autorestart: true,
@@ -61,22 +61,6 @@ module.exports = {
       autorestart: true,
       max_restarts: 10,
       restart_delay: 3000,
-      time: true
-    },
-
-    // ── Webhook Server (Auto Deploy) ─────────────────────
-    {
-      name: 'salarypay-webhook',
-      script: 'webhook.py',
-      cwd: '/opt/license-manager',
-      interpreter: '/opt/license-manager/venv/bin/python3',
-      watch: false,
-      autorestart: true,
-      max_restarts: 5,
-      env: {
-        WEBHOOK_SECRET: 'change-this-to-your-secret',
-        FLASK_ENV: 'production'
-      },
       time: true
     }
   ]

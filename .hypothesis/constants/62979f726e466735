@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\services\invoice.py
+# hypothesis_version: 6.152.4
+
+[0.3, 0.5, 100, '#1976D2', '#2E7D32', '#E8F5E9', '%Y%m', '%d %B %Y', '+91 22 1234 5678', '-', '27AABCS1234F1Z5', 'ALIGN', 'Amount (₹)', 'BACKGROUND', 'BOTTOMPADDING', 'CustomHeading', 'CustomTitle', 'Customer not found', 'Description', 'FONTNAME', 'FONTSIZE', 'GRID', 'Heading1', 'Heading2', 'Helvetica', 'Helvetica-Bold', 'Invalid plan', 'Invoice Date:', 'Invoice Details', 'Invoice Number:', 'Invoice not found', 'LEFTPADDING', 'MIDDLE', 'N/A', 'Normal', 'Payment ID:', 'Payment not found', 'RIGHT', 'RIGHTPADDING', 'SalaryPay', 'Subtotal', 'TAX INVOICE', 'TEXTCOLOR', 'TOP', 'TOPPADDING', 'Total Amount', 'VALIGN', 'basic', 'invoices', 'premium']

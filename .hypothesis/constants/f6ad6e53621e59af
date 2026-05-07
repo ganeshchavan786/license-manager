@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\payment.py
+# hypothesis_version: 6.152.4
+
+[400, 404, 500, '/create-order', '/payment', '/verify', '/webhook', 'Invalid plan', 'License not found', 'Payment', 'X-Razorpay-Signature', 'amount', 'basic', 'cancelled', 'captured', 'code', 'currency', 'customer_id', 'discount_amount', 'discount_info', 'entity', 'event', 'final_amount', 'free', 'id', 'invoice_number', 'license_key', 'message', 'notes', 'ok', 'order_id', 'payload', 'payment', 'payment.captured', 'payment_verified', 'plan', 'premium', 'promo_applied', 'promo_code', 'promo_code_id', 'reason', 'status', 'subscription', 'subscription.charged', 'success', 'valid', 'valid_till']

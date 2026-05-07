@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\settings.py
+# hypothesis_version: 6.152.4
+
+['***', '/api/admin/settings', '/business', '/cors/origins', '/payment-gateway', '/plans', '/plans/features', '/smtp', '/smtp/test', '/system', 'admin', 'admin-settings', 'basic', 'free', 'message', 'origins', 'payment_gateway_mode', 'premium', 'razorpay_key_id', 'razorpay_key_secret', 'smtp_from_email', 'smtp_host', 'smtp_password', 'smtp_port', 'smtp_use_tls', 'smtp_username', 'success', 'trial', 'username']

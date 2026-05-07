@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\analytics.py
+# hypothesis_version: 6.152.4
+
+[200, 365, 400, 2020, 2100, '/admin/feature-stats', '/admin/overview', '/analytics', '/dashboard', '/monthly-report', '/track', 'Invalid year', 'analytics', 'end', 'feature_stats', 'period', 'start', 'user-agent']

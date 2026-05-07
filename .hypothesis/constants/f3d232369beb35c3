@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\invoice.py
+# hypothesis_version: 6.152.4
+
+[100, 400, 404, 500, '/admin/list', '/invoices', '/list', '/{invoice_id}', '/{invoice_id}/email', 'Invoice not found', 'application/pdf', 'invoice_number', 'invoices', 'message', 'pdf_path', 'success']

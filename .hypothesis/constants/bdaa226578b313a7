@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\services\auth.py
+# hypothesis_version: 6.152.4
+
+['Bearer', 'WWW-Authenticate', 'api/auth/admin/login', 'auto', 'exp', 'pbkdf2_sha256', 'sub']

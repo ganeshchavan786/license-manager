@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\email.py
+# hypothesis_version: 6.152.4
+
+[100, 400, 401, 404, 500, '/admin/queue', '/cron/process-emails', '/email', 'Email not found', 'email', 'failed', 'pending', 'sent', 'trial']

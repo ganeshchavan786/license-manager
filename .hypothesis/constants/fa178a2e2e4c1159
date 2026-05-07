@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\main.py
+# hypothesis_version: 6.152.4
+
+[404, '*', '.css', '/', '/api', '/docs', '/health', '/redoc', '1.0.0', 'Not Found', 'Process Email Queue', 'SERVE_FRONTEND', 'Send Trial Reminders', 'app', 'detail', 'dist', 'false', 'frontend', 'index.html', 'ok', 'process_email_queue', 'running', 'send_trial_reminders', 'shutdown', 'startup', 'status', 'text/css', 'trial', 'true', 'version']

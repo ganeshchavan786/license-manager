@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\services\email.py
+# hypothesis_version: 6.152.4
+
+[100, 465, 587, '%d %B %Y', '@', 'Customer not found', 'From', 'Subject', 'To', 'alternative', 'basic', 'emails', 'failed', 'html', 'pending', 'plain', 'premium', 'sent', 'templates', 'trial', 'trial_reminder.html', 'welcome.html', 'xml']

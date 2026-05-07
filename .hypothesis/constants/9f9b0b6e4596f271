@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\promo.py
+# hypothesis_version: 6.152.4
+
+[400, 404, 500, '/admin/create', '/admin/list', '/apply', '/promo', '/validate', 'Promo code not found', '^(basic|premium)$', '^(percentage|fixed)$', 'message', 'promo', 'sub', 'success']

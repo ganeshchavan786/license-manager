@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\database.py
+# hypothesis_version: 6.152.4
+
+['check_same_thread', 'sqlite']

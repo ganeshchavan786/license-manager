@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\admin.py
+# hypothesis_version: 6.152.4
+
+[100, 365, 400, 404, 2020, '/admin', '/customers', '/payments', '/stats', 'Admin Dashboard', 'Customer not found', 'Invalid plan', 'License not found', 'Unknown', 'active_trials', 'amount', 'arpu', 'basic', 'basic_plan', 'basic_revenue', 'business_name', 'captured', 'city', 'conversion_rate', 'created_at', 'customer', 'customer_id', 'customers', 'email', 'free', 'free_plan', 'id', 'is_active', 'licenses', 'machine_id', 'month', 'new_plan', 'none', 'owner_name', 'payments', 'phone', 'plan', 'premium', 'premium_plan', 'premium_revenue', 'razorpay_payment_id', 'recent_registrations', 'revenue_this_period', 'revenue_total', 'status', 'success', 'today', 'total', 'total_customers', 'trial', 'valid_till', 'week', 'year']

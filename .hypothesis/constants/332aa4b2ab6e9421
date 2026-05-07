@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\license.py
+# hypothesis_version: 6.152.4
+
+[365, 400, 404, '/create-order', '/license', '/status/{machine_id}', '/validate', '/verify-payment', 'INR', 'Invalid license', 'License', 'License not found', 'amount', 'business_name', 'currency', 'days_remaining', 'email', 'encrypted_cache', 'features', 'found', 'free', 'grace_period_days', 'license_key', 'message', 'new_expiry', 'notes', 'plan', 'premium', 'razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature', 'reason', 'receipt', 'status', 'success', 'unknown', 'valid', 'valid_till']

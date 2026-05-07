@@ -52,12 +52,24 @@ module.exports = {
       time: true
     },
 
+    // ── Proxy Server (Single Domain) ─────────────────────
+    {
+      name: 'salarypay-proxy',
+      script: 'proxy-server.js',
+      cwd: '/opt/license-manager',
+      watch: false,
+      autorestart: true,
+      max_restarts: 10,
+      restart_delay: 3000,
+      time: true
+    },
+
     // ── Webhook Server (Auto Deploy) ─────────────────────
     {
       name: 'salarypay-webhook',
       script: 'webhook.py',
-      cwd: '/var/www/salarypay',
-      interpreter: '/var/www/salarypay/venv/bin/python3',
+      cwd: '/opt/license-manager',
+      interpreter: '/opt/license-manager/venv/bin/python3',
       watch: false,
       autorestart: true,
       max_restarts: 5,
@@ -65,10 +77,6 @@ module.exports = {
         WEBHOOK_SECRET: 'change-this-to-your-secret',
         FLASK_ENV: 'production'
       },
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      error_file: '/var/log/salarypay/webhook-error.log',
-      out_file: '/var/log/salarypay/webhook-out.log',
-      merge_logs: true,
       time: true
     }
   ]

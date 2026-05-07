@@ -21,7 +21,6 @@ function Checkout() {
   // Legacy support: key parameter असेल तर पण handle करा
   const rawKey = searchParams.get('key')
   const licenseKey = rawKey ? rawKey.replace(/ /g, '+') : null
-  const plan = searchParams.get('plan') || 'basic'
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   

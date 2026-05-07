@@ -144,15 +144,21 @@ export function hasFeature(userFeatures, featureName) {
 }
 
 // ── Create Razorpay Order ───────────────────────────────────────
-export async function createPaymentOrder(plan) {
+export async function createPaymentOrder(plan, promoCode = null) {
   const customerId = localStorage.getItem("sp_customer_id");
+  const body = { plan, customer_id: customerId };
+  if (promoCode) body.promo_code = promoCode;
+
   const response = await fetch(`${LICENSE_SERVER}/payment/create-order`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plan, customer_id: customerId }),
+    body: JSON.stringify(body),
   });
 
-  if (!response.ok) throw new Error("Order creation failed");
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Order creation failed");
+  }
   return response.json();
 }
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { createPaymentOrder, verifyPayment } from '../../services/licenseService'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8661'
 
@@ -85,29 +86,26 @@ function Checkout() {
     
     setLoading(true)
     try {
-      // १. सर्व्हरवर ऑर्डर तयार करा (with promo code discount if applied)
-      const { data: order } = await axios.post(`${API_URL}/api/license/create-order`, {
-        license_key: licenseKey,
-        amount: finalAmount // Use discounted amount if promo applied
-      })
+      // १. सर्व्हरवर ऑर्डर तयार करा — correct endpoint + body
+      const order = await createPaymentOrder(
+        plan,
+        promoApplied ? promoCode : null
+      )
 
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_xxxxxxxxxx',
         amount: order.amount,
         currency: order.currency,
-        name: "SalaryPay Premium",
-        description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan - 1 Year License`,
-        order_id: order.id,
+        name: "SalaryPay",
+        description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
+        order_id: order.order_id,
         handler: async (response) => {
           // २. पेमेंट झाल्यावर व्हेरिफाय करा
           try {
-            const verifyRes = await axios.post(`${API_URL}/api/license/verify-payment`, {
-              ...response,
-              license_key: licenseKey
-            })
-            if (verifyRes.data.status === 'success') {
-              alert("✅ Payment Successful! License extended.")
-              window.close() // पेमेंट झाल्यावर विंडो बंद करा
+            const result = await verifyPayment(response, plan)
+            if (result.success) {
+              alert(`✅ Payment Successful! ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan activated.`)
+              navigate('/')
             }
           } catch (err) {
             alert("Payment verification failed!")
@@ -118,9 +116,6 @@ function Checkout() {
           email: "customer@example.com",
         },
         theme: { color: "#4f46e5" },
-        notes: {
-          promo_code: promoApplied ? promoCode : null
-        }
       }
 
       const rzp = new window.Razorpay(options)

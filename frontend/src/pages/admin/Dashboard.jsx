@@ -175,11 +175,14 @@ function UpgradeModal({ upgradeModal, setUpgradeModal, headers, fetchData }) {
 }
 
 // ─── Customer Detail Modal ────────────────────────────────────────────────────
-function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, headers, openUpgradeModal }) {
+function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, headers, openUpgradeModal, onTrialExtended }) {
   const [activeTab, setActiveTab] = useState('details')
   const [payments, setPayments] = useState([])
   const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [paymentsFetched, setPaymentsFetched] = useState(false)
+  const [extendTrialDays, setExtendTrialDays] = useState(null) // null = not showing, 7/14/30 = selected
+  const [extendLoading, setExtendLoading] = useState(false)
+  const [extendSuccess, setExtendSuccess] = useState('')
 
   if (!customer) return null
 
@@ -501,21 +504,95 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
         )}
 
         {/* Actions */}
-        <div className="p-4 border-t border-slate-100 flex gap-2">
-          <button
-            onClick={() => { onToggleStatus(customer.id); onClose(); }}
-            className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase border transition-all ${
-              customer.is_active
-                ? 'border-red-200 text-red-500 hover:bg-red-50'
-                : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-            }`}>
-            {customer.is_active ? 'Block' : 'Unblock'}
-          </button>
-          <button
-            onClick={() => { onClose(); openUpgradeModal(customer); }}
-            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-indigo-700 transition-all">
-            Upgrade / Extend
-          </button>
+        <div className="p-4 border-t border-slate-100 space-y-2">
+          {/* Extend Trial — फक्त trial plan साठी दाखवा */}
+          {customer.plan === 'trial' && (
+            <div>
+              {extendSuccess ? (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg p-2.5 text-[10px] font-bold text-center">
+                  {extendSuccess}
+                </div>
+              ) : extendTrialDays === null ? (
+                <button
+                  onClick={() => setExtendTrialDays(7)}
+                  className="w-full py-2 rounded-lg text-[10px] font-bold uppercase border-2 border-amber-300 text-amber-600 hover:bg-amber-50 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Clock size={12} /> Extend Trial
+                </button>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                  <p className="text-[9px] font-bold text-amber-700 uppercase tracking-widest">Extend trial by:</p>
+                  <div className="flex gap-1.5">
+                    {[7, 14, 30].map(d => (
+                      <button
+                        key={d}
+                        onClick={() => setExtendTrialDays(d)}
+                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold border-2 transition-all ${
+                          extendTrialDays === d
+                            ? 'border-amber-500 bg-amber-100 text-amber-700'
+                            : 'border-amber-200 text-amber-500 hover:border-amber-400'
+                        }`}
+                      >
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setExtendTrialDays(null)}
+                      className="flex-1 py-1.5 rounded-lg text-[10px] font-bold border border-slate-200 text-slate-400 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={extendLoading}
+                      onClick={async () => {
+                        setExtendLoading(true)
+                        try {
+                          await axios.post(
+                            `${API_URL}/api/admin/customers/${customer.id}/extend-trial?days=${extendTrialDays}`,
+                            {},
+                            { headers }
+                          )
+                          setExtendSuccess(`Trial extended by ${extendTrialDays} days! ✓`)
+                          setExtendTrialDays(null)
+                          setTimeout(() => {
+                            setExtendSuccess('')
+                            onClose()
+                            onTrialExtended && onTrialExtended()
+                          }, 1800)
+                        } catch (err) {
+                          alert('Failed: ' + (err.response?.data?.detail || err.message))
+                        } finally {
+                          setExtendLoading(false)
+                        }
+                      }}
+                      className="flex-1 py-1.5 bg-amber-500 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-amber-600 disabled:opacity-50 transition-all"
+                    >
+                      {extendLoading ? '...' : 'Confirm'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => { onToggleStatus(customer.id); onClose(); }}
+              className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase border transition-all ${
+                customer.is_active
+                  ? 'border-red-200 text-red-500 hover:bg-red-50'
+                  : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+              }`}>
+              {customer.is_active ? 'Block' : 'Unblock'}
+            </button>
+            <button
+              onClick={() => { onClose(); openUpgradeModal(customer); }}
+              className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-indigo-700 transition-all">
+              Upgrade / Extend
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -763,6 +840,7 @@ function Dashboard() {
           onToggleStatus={(id) => toggleStatus(id)}
           headers={headers}
           openUpgradeModal={(c) => { setSelectedCustomer(null); openUpgradeModal(c); }}
+          onTrialExtended={() => fetchData()}
         />
       )}
 

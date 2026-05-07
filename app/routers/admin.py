@@ -196,6 +196,80 @@ def get_customer(
     }
 
 
+@router.post("/customers/{customer_id}/extend-trial")
+def extend_trial(
+    customer_id: str,
+    days: int = 7,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """Trial period extend करा — फक्त trial plan साठी"""
+    if days not in [7, 14, 30]:
+        raise HTTPException(status_code=400, detail="Days must be 7, 14, or 30")
+
+    license = db.query(License).filter(
+        License.customer_id == customer_id,
+        License.is_active == True
+    ).first()
+
+    if not license:
+        raise HTTPException(status_code=404, detail="License not found")
+
+    if license.plan != "trial":
+        raise HTTPException(status_code=400, detail="Only trial plans can be extended")
+
+    now = datetime.now(timezone.utc)
+
+    # trial_end extend करा — आधीच expire झाली असेल तर now पासून, नाहीतर existing trial_end पासून
+    existing_trial_end = license.trial_end
+    if existing_trial_end and existing_trial_end.tzinfo is None:
+        existing_trial_end = existing_trial_end.replace(tzinfo=timezone.utc)
+
+    base = max(now, existing_trial_end) if existing_trial_end else now
+    new_trial_end = base + timedelta(days=days)
+
+    # valid_till पण update करा
+    existing_valid_till = license.valid_till
+    if existing_valid_till and existing_valid_till.tzinfo is None:
+        existing_valid_till = existing_valid_till.replace(tzinfo=timezone.utc)
+
+    base_vt = max(now, existing_valid_till) if existing_valid_till else now
+    new_valid_till = base_vt + timedelta(days=days)
+
+    # नवीन license key generate करा
+    from app.services.license import generate_license_key
+    new_key = generate_license_key(
+        customer_id=customer_id,
+        machine_id=license.machine_id,
+        plan="trial",
+        valid_till=new_valid_till
+    )
+
+    license.trial_end = new_trial_end
+    license.valid_till = new_valid_till
+    license.license_key = new_key
+    license.last_validated = now
+    db.commit()
+    db.refresh(license)
+
+    log = AuditLog(
+        customer_id=customer_id,
+        action="trial_extended",
+        machine_id=license.machine_id,
+        details=f"extended_by={days}days, new_trial_end={new_trial_end.isoformat()}"
+    )
+    db.add(log)
+    db.commit()
+
+    return {
+        "success": True,
+        "customer_id": customer_id,
+        "extended_by_days": days,
+        "new_trial_end": new_trial_end.isoformat(),
+        "new_valid_till": new_valid_till.isoformat(),
+    }
+
+
 @router.post("/customers/{customer_id}/upgrade")
 def manual_upgrade(
     customer_id: str,

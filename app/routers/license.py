@@ -70,10 +70,10 @@ class PaymentVerify(BaseModel):
 @router.post("/create-order")
 def create_order(req: PaymentRequest, db: Session = Depends(get_db)):
     """Razorpay Order तयार करतो — customer_id किंवा license_key वापरतो"""
-    from app.services.license import verify_license_key
-    
-    # Razorpay Client
-    client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+    from app.services.razorpay import get_razorpay_client
+
+    # DB मधून Razorpay client (UI settings)
+    client = get_razorpay_client(db)
     license = None
 
     # Option 1: customer_id दिला असेल तर
@@ -86,18 +86,32 @@ def create_order(req: PaymentRequest, db: Session = Depends(get_db)):
     # Option 2: license_key दिली असेल तर
     if not license and req.license_key:
         fixed_key = req.license_key.replace(" ", "+")
+
+        # Exact match
         license = db.query(License).filter(
             License.license_key == fixed_key,
             License.is_active == True
         ).first()
-        
+
+        # JWT signature verify न करता base64 decode करून customer_id काढा
         if not license:
-            payload = verify_license_key(fixed_key)
-            if payload:
-                license = db.query(License).filter(
-                    License.customer_id == payload.get("customer_id"),
-                    License.is_active == True
-                ).first()
+            try:
+                import base64, json as _json
+                parts = fixed_key.split(".")
+                if len(parts) == 3:
+                    payload_b64 = parts[1]
+                    # Padding fix
+                    payload_b64 += "=" * (4 - len(payload_b64) % 4)
+                    payload_bytes = base64.urlsafe_b64decode(payload_b64)
+                    payload_data = _json.loads(payload_bytes)
+                    cid = payload_data.get("customer_id")
+                    if cid:
+                        license = db.query(License).filter(
+                            License.customer_id == cid,
+                            License.is_active == True
+                        ).first()
+            except Exception:
+                pass
 
     if not license:
         raise HTTPException(status_code=404, detail="License not found")

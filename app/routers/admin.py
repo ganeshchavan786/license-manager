@@ -20,11 +20,24 @@ def list_customers(
     """सर्व customers list करा"""
     customers = db.query(Customer).order_by(Customer.created_at.desc()).offset(skip).limit(limit).all()
     result = []
+    now = datetime.now(timezone.utc)
     for c in customers:
         license = db.query(License).filter(
             License.customer_id == c.id,
             License.is_active == True
         ).first()
+
+        # Days remaining calculate करा
+        days_remaining = None
+        is_expired = False
+        if license and license.valid_till:
+            vt = license.valid_till
+            if vt.tzinfo is None:
+                vt = vt.replace(tzinfo=timezone.utc)
+            delta = (vt - now).days
+            days_remaining = max(0, delta)
+            is_expired = vt < now
+
         result.append({
             "id": c.id,
             "business_name": c.business_name,
@@ -34,7 +47,12 @@ def list_customers(
             "city": c.city,
             "is_active": c.is_active,
             "plan": license.plan if license else "none",
-            "valid_till": license.valid_till.isoformat() if license else None,
+            "valid_till": license.valid_till.isoformat() if license and license.valid_till else None,
+            "trial_start": license.trial_start.isoformat() if license and license.trial_start else None,
+            "trial_end": license.trial_end.isoformat() if license and license.trial_end else None,
+            "license_start": license.created_at.isoformat() if license and license.created_at else None,
+            "days_remaining": days_remaining,
+            "is_expired": is_expired,
             "created_at": c.created_at.isoformat(),
         })
     return {"total": len(result), "customers": result}

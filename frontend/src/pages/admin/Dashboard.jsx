@@ -21,13 +21,199 @@ import {
   Download,
   Mail,
   Settings as SettingsIcon,
-  BarChart3
+  BarChart3,
+  Calendar,
+  AlertTriangle,
+  CheckCircle,
+  ChevronRight,
+  Phone,
+  MapPin,
+  User
 } from 'lucide-react'
 import AnalyticsDashboard from '../analytics/Dashboard'
 import Settings from './Settings'
 import PromoCodeManagement from './PromoCodeManagement'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8661'
+
+// ─── Customer Detail Modal ────────────────────────────────────────────────────
+function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, headers }) {
+  if (!customer) return null
+
+  const now = new Date()
+  const validTill = customer.valid_till ? new Date(customer.valid_till) : null
+  const trialStart = customer.trial_start ? new Date(customer.trial_start) : null
+  const trialEnd = customer.trial_end ? new Date(customer.trial_end) : null
+  const licenseStart = customer.license_start ? new Date(customer.license_start) : null
+
+  const planColors = {
+    premium: 'bg-emerald-100 text-emerald-700',
+    basic: 'bg-blue-100 text-blue-700',
+    trial: 'bg-amber-100 text-amber-700',
+    free: 'bg-slate-100 text-slate-600',
+    none: 'bg-red-100 text-red-600',
+  }
+
+  const getDaysLabel = () => {
+    if (customer.is_expired) return { text: 'Expired', color: 'text-red-500' }
+    if (customer.days_remaining === 0) return { text: 'Expires today', color: 'text-orange-500' }
+    if (customer.days_remaining <= 3) return { text: `${customer.days_remaining}d left`, color: 'text-orange-500' }
+    if (customer.days_remaining <= 7) return { text: `${customer.days_remaining}d left`, color: 'text-amber-500' }
+    return { text: `${customer.days_remaining}d left`, color: 'text-emerald-600' }
+  }
+
+  const daysLabel = customer.days_remaining !== null ? getDaysLabel() : null
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-5 border-b border-slate-100 flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-black text-sm">
+              {customer.business_name[0]}
+            </div>
+            <div>
+              <h2 className="font-black text-slate-900 text-sm">{customer.business_name}</h2>
+              <p className="text-[10px] text-slate-400">{customer.email}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4">
+          {/* Plan + Status */}
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${planColors[customer.plan] || planColors.none}`}>
+              {customer.plan}
+            </span>
+            <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${customer.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+              {customer.is_active ? 'Active' : 'Blocked'}
+            </span>
+            {daysLabel && (
+              <span className={`text-[10px] font-bold ${daysLabel.color}`}>
+                • {daysLabel.text}
+              </span>
+            )}
+          </div>
+
+          {/* Subscription Dates */}
+          <div className="bg-slate-50 rounded-xl p-4 space-y-2.5">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Subscription Dates</p>
+
+            <DateRow
+              icon={<Calendar size={12} />}
+              label="Registered"
+              value={new Date(customer.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            />
+
+            {(trialStart || licenseStart) && (
+              <DateRow
+                icon={<CheckCircle size={12} className="text-blue-500" />}
+                label="Plan Start"
+                value={(trialStart || licenseStart).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              />
+            )}
+
+            {trialEnd && customer.plan === 'trial' && (
+              <DateRow
+                icon={<Clock size={12} className="text-amber-500" />}
+                label="Trial Ends"
+                value={trialEnd.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                highlight={customer.days_remaining <= 3}
+              />
+            )}
+
+            {validTill && customer.plan !== 'trial' && customer.plan !== 'free' && (
+              <DateRow
+                icon={customer.is_expired
+                  ? <AlertTriangle size={12} className="text-red-500" />
+                  : <CheckCircle size={12} className="text-emerald-500" />
+                }
+                label="Expires On"
+                value={validTill.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                highlight={customer.is_expired || customer.days_remaining <= 7}
+                expired={customer.is_expired}
+              />
+            )}
+
+            {customer.days_remaining !== null && !customer.is_expired && customer.plan !== 'free' && (
+              <div className="mt-2 pt-2 border-t border-slate-200">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[9px] text-slate-400 font-bold uppercase">Days Remaining</span>
+                  <span className={`text-[10px] font-black ${daysLabel.color}`}>{customer.days_remaining} days</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${
+                      customer.days_remaining <= 3 ? 'bg-red-500' :
+                      customer.days_remaining <= 7 ? 'bg-orange-500' :
+                      customer.days_remaining <= 15 ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, (customer.days_remaining / 30) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Contact Info */}
+          <div className="space-y-1.5">
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Contact</p>
+            <div className="flex items-center gap-2 text-[10px] text-slate-600">
+              <User size={11} className="text-slate-400" /> {customer.owner_name}
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-slate-600">
+              <Phone size={11} className="text-slate-400" /> {customer.phone}
+            </div>
+            {customer.city && (
+              <div className="flex items-center gap-2 text-[10px] text-slate-600">
+                <MapPin size={11} className="text-slate-400" /> {customer.city}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="p-4 border-t border-slate-100 flex gap-2">
+          <button
+            onClick={() => { onToggleStatus(customer.id); onClose(); }}
+            className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase border transition-all ${
+              customer.is_active
+                ? 'border-red-200 text-red-500 hover:bg-red-50'
+                : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+            }`}
+          >
+            {customer.is_active ? 'Block' : 'Unblock'}
+          </button>
+          <button
+            onClick={() => { onUpgrade(customer.id); onClose(); }}
+            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-indigo-700 transition-all"
+          >
+            Upgrade / Extend
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DateRow({ icon, label, value, highlight, expired }) {
+  return (
+    <div className="flex justify-between items-center">
+      <div className="flex items-center gap-1.5 text-slate-500">
+        {icon}
+        <span className="text-[10px]">{label}</span>
+      </div>
+      <span className={`text-[10px] font-bold ${expired ? 'text-red-500' : highlight ? 'text-orange-500' : 'text-slate-700'}`}>
+        {value}
+      </span>
+    </div>
+  )
+}
 
 function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview')
@@ -39,6 +225,7 @@ function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [selectedCustomer, setSelectedCustomer] = useState(null)
   const navigate = useNavigate()
 
   // JWT Token Fetch करा
@@ -105,6 +292,16 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row text-[11px]">
+      {/* Customer Detail Modal */}
+      {selectedCustomer && (
+        <CustomerDetailModal
+          customer={selectedCustomer}
+          onClose={() => setSelectedCustomer(null)}
+          onUpgrade={(id) => manualUpgrade(id)}
+          onToggleStatus={(id) => toggleStatus(id)}
+          headers={headers}
+        />
+      )}
       {/* Mobile Header */}
       <div className="lg:hidden bg-white border-b border-slate-200 p-2 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-1.5">
@@ -226,28 +423,89 @@ function Dashboard() {
                       <th className="pb-2">Business</th>
                       <th className="pb-2">Joined</th>
                       <th className="pb-2">Plan</th>
+                      <th className="pb-2">Expiry</th>
                       <th className="pb-2">Status</th>
                       <th className="pb-2 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {filteredCustomers.map((c) => (
-                      <tr key={c.id} className="text-[10px] hover:bg-slate-50/50">
-                        <td className="py-2 font-bold text-slate-700">{c.business_name} <br/><span className="font-normal text-[9px] text-slate-400">{c.email}</span></td>
-                        <td className="py-2 text-slate-500">{new Date(c.created_at).toLocaleDateString()}</td>
-                        <td className="py-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${c.plan === 'premium' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{c.plan}</span>
-                        </td>
-                        <td className="py-2">
-                          <button onClick={() => toggleStatus(c.id)} className={`font-bold ${c.is_active ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {c.is_active ? 'Active' : 'Blocked'}
-                          </button>
-                        </td>
-                        <td className="py-2 text-right">
-                          <button onClick={() => manualUpgrade(c.id)} className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-600 hover:text-white uppercase">Upgrade</button>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredCustomers.map((c) => {
+                      const daysRemaining = c.days_remaining
+                      const isExpired = c.is_expired
+                      const validTill = c.valid_till ? new Date(c.valid_till) : null
+                      const trialEnd = c.trial_end ? new Date(c.trial_end) : null
+                      const expiryDate = c.plan === 'trial' ? trialEnd : validTill
+
+                      const daysColor = isExpired ? 'text-red-500' :
+                        daysRemaining <= 3 ? 'text-red-500' :
+                        daysRemaining <= 7 ? 'text-orange-500' :
+                        daysRemaining <= 15 ? 'text-amber-500' : 'text-emerald-600'
+
+                      return (
+                        <tr
+                          key={c.id}
+                          className="text-[10px] hover:bg-slate-50/80 cursor-pointer transition-colors"
+                          onClick={() => setSelectedCustomer(c)}
+                        >
+                          <td className="py-2.5 font-bold text-slate-700">
+                            {c.business_name}
+                            <br/>
+                            <span className="font-normal text-[9px] text-slate-400">{c.email}</span>
+                          </td>
+                          <td className="py-2.5 text-slate-500">
+                            {new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                          </td>
+                          <td className="py-2.5">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${
+                              c.plan === 'premium' ? 'bg-emerald-100 text-emerald-700' :
+                              c.plan === 'basic' ? 'bg-blue-100 text-blue-700' :
+                              c.plan === 'trial' ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-500'
+                            }`}>{c.plan}</span>
+                          </td>
+                          <td className="py-2.5">
+                            {expiryDate && c.plan !== 'free' ? (
+                              <div>
+                                <p className="text-slate-600">
+                                  {expiryDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                                </p>
+                                {daysRemaining !== null && (
+                                  <p className={`text-[9px] font-bold ${daysColor}`}>
+                                    {isExpired ? 'Expired' : `${daysRemaining}d left`}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                          <td className="py-2.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleStatus(c.id); }}
+                              className={`font-bold ${c.is_active ? 'text-emerald-500' : 'text-red-500'}`}
+                            >
+                              {c.is_active ? 'Active' : 'Blocked'}
+                            </button>
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); manualUpgrade(c.id); }}
+                                className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-600 hover:text-white uppercase text-[9px]"
+                              >
+                                Upgrade
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedCustomer(c); }}
+                                className="p-1 text-slate-400 hover:text-slate-700"
+                              >
+                                <ChevronRight size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

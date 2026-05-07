@@ -19,8 +19,8 @@ const path = require('path')
 const PORT = 8080
 
 const TARGETS = {
-  api:      'http://localhost:8661',
-  frontend: 'http://localhost:3441',
+  api:      'http://127.0.0.1:8661',
+  frontend: 'http://127.0.0.1:3441',
 }
 
 const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true })

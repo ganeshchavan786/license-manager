@@ -28,7 +28,8 @@ import {
   ChevronRight,
   Phone,
   MapPin,
-  User
+  User,
+  Receipt
 } from 'lucide-react'
 import AnalyticsDashboard from '../analytics/Dashboard'
 import Settings from './Settings'
@@ -36,8 +37,150 @@ import PromoCodeManagement from './PromoCodeManagement'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8661'
 
+const PLAN_PRICES = { basic: 499, premium: 999 }
+const GRACE_PERIOD_DAYS = { basic: 15, premium: 30, trial: 15, free: 15 }
+
+// ─── Upgrade Modal ────────────────────────────────────────────────────────────
+function UpgradeModal({ upgradeModal, setUpgradeModal, headers, fetchData }) {
+  const { open, customer, plan, months } = upgradeModal
+  const [loading, setLoading] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
+
+  if (!open || !customer) return null
+
+  const price = PLAN_PRICES[plan] || 0
+  const total = price * months
+
+  const currentExpiry = customer.valid_till ? new Date(customer.valid_till) : null
+  const now = new Date()
+  const base = currentExpiry && currentExpiry > now ? currentExpiry : now
+  const newExpiry = new Date(base)
+  newExpiry.setDate(newExpiry.getDate() + months * 30)
+
+  const fmtDate = (d) => d ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+
+  const handleConfirm = async () => {
+    setLoading(true)
+    try {
+      await axios.post(
+        `${API_URL}/api/admin/customers/${customer.id}/upgrade?plan=${plan}&months=${months}`,
+        {},
+        { headers }
+      )
+      setSuccessMsg('Upgraded successfully!')
+      setTimeout(() => {
+        setSuccessMsg('')
+        setUpgradeModal({ open: false, customer: null, plan: 'basic', months: 1 })
+        fetchData()
+      }, 1500)
+    } catch (err) {
+      alert('Upgrade failed: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 z-[60] flex items-center justify-center p-4"
+      onClick={() => setUpgradeModal({ open: false, customer: null, plan: 'basic', months: 1 })}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+          <div>
+            <h2 className="font-black text-slate-900 text-sm">Upgrade / Extend Plan</h2>
+            <p className="text-[10px] text-slate-400 mt-0.5">{customer.business_name}</p>
+          </div>
+          <button onClick={() => setUpgradeModal({ open: false, customer: null, plan: 'basic', months: 1 })}
+            className="p-1 text-slate-400 hover:text-slate-700"><X size={16} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {successMsg && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg p-3 text-[10px] font-bold text-center">
+              {successMsg}
+            </div>
+          )}
+
+          {/* Plan selector */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Plan</p>
+            <div className="flex gap-2">
+              {['basic', 'premium'].map(p => (
+                <button key={p}
+                  onClick={() => setUpgradeModal(prev => ({ ...prev, plan: p }))}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase border-2 transition-all ${
+                    plan === p
+                      ? p === 'premium' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 text-slate-400 hover:border-slate-300'
+                  }`}>
+                  {p}<br/>
+                  <span className="text-[9px] font-normal">₹{PLAN_PRICES[p]}/mo</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Months selector */}
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Duration</p>
+            <div className="flex gap-1.5">
+              {[1, 3, 6, 12].map(m => (
+                <button key={m}
+                  onClick={() => setUpgradeModal(prev => ({ ...prev, months: m }))}
+                  className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold border-2 transition-all ${
+                    months === m
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 text-slate-400 hover:border-slate-300'
+                  }`}>
+                  {m}mo
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Price preview */}
+          <div className="bg-slate-50 rounded-xl p-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] text-slate-500">Total</span>
+              <span className="text-sm font-black text-indigo-600">₹{total.toLocaleString()}</span>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-200 text-[9px] text-slate-400">
+              <div className="flex justify-between">
+                <span>Current expiry:</span>
+                <span className="font-bold text-slate-600">{fmtDate(currentExpiry)}</span>
+              </div>
+              <div className="flex justify-between mt-0.5">
+                <span>New expiry:</span>
+                <span className="font-bold text-emerald-600">{fmtDate(newExpiry)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-slate-100 flex gap-2">
+          <button
+            onClick={() => setUpgradeModal({ open: false, customer: null, plan: 'basic', months: 1 })}
+            className="flex-1 py-2 rounded-lg text-[10px] font-bold uppercase border border-slate-200 text-slate-500 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={loading}
+            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-indigo-700 disabled:opacity-50 transition-all">
+            {loading ? 'Processing...' : 'Confirm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Customer Detail Modal ────────────────────────────────────────────────────
-function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, headers }) {
+function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, headers, openUpgradeModal }) {
+  const [activeTab, setActiveTab] = useState('details')
+  const [payments, setPayments] = useState([])
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  const [paymentsFetched, setPaymentsFetched] = useState(false)
+
   if (!customer) return null
 
   const now = new Date()
@@ -54,8 +197,21 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
     none: 'bg-red-100 text-red-600',
   }
 
+  // Feature 4: Grace period calculation
+  const graceTotalDays = GRACE_PERIOD_DAYS[customer.plan] || 15
+  let graceRemaining = null
+  if (customer.is_expired && validTill) {
+    const daysSinceExpiry = Math.floor((now - validTill) / (1000 * 60 * 60 * 24))
+    graceRemaining = graceTotalDays - daysSinceExpiry
+  }
+
   const getDaysLabel = () => {
-    if (customer.is_expired) return { text: 'Expired', color: 'text-red-500' }
+    if (customer.is_expired) {
+      if (graceRemaining !== null && graceRemaining > 0) {
+        return { text: `Grace: ${graceRemaining}d`, color: 'text-orange-500' }
+      }
+      return { text: 'Grace Expired', color: 'text-red-500' }
+    }
     if (customer.days_remaining === 0) return { text: 'Expires today', color: 'text-orange-500' }
     if (customer.days_remaining <= 3) return { text: `${customer.days_remaining}d left`, color: 'text-orange-500' }
     if (customer.days_remaining <= 7) return { text: `${customer.days_remaining}d left`, color: 'text-amber-500' }
@@ -63,6 +219,53 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
   }
 
   const daysLabel = customer.days_remaining !== null ? getDaysLabel() : null
+
+  const fetchPayments = async () => {
+    if (paymentsFetched) return
+    setPaymentsLoading(true)
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/customers/${customer.id}/payments`, { headers })
+      setPayments(res.data.payments || [])
+      setPaymentsFetched(true)
+    } catch (err) {
+      console.error('Failed to fetch payments', err)
+    } finally {
+      setPaymentsLoading(false)
+    }
+  }
+
+  const handleTabClick = (tab) => {
+    setActiveTab(tab)
+    if (tab === 'payments') fetchPayments()
+  }
+
+  const downloadInvoice = async (invoiceId, invoiceNumber) => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/invoices/admin/${invoiceId}/download`,
+        { headers, responseType: 'blob' }
+      )
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `${invoiceNumber || invoiceId}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Failed to download invoice')
+    }
+  }
+
+  const statusBadge = (status) => {
+    const map = {
+      captured: 'bg-emerald-100 text-emerald-700',
+      failed: 'bg-red-100 text-red-700',
+      pending: 'bg-amber-100 text-amber-700',
+    }
+    return map[status] || 'bg-slate-100 text-slate-600'
+  }
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -83,99 +286,219 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-5 space-y-4">
-          {/* Plan + Status */}
-          <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${planColors[customer.plan] || planColors.none}`}>
-              {customer.plan}
-            </span>
-            <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${customer.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-              {customer.is_active ? 'Active' : 'Blocked'}
-            </span>
-            {daysLabel && (
-              <span className={`text-[10px] font-bold ${daysLabel.color}`}>
-                • {daysLabel.text}
-              </span>
-            )}
-          </div>
-
-          {/* Subscription Dates */}
-          <div className="bg-slate-50 rounded-xl p-4 space-y-2.5">
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Subscription Dates</p>
-
-            <DateRow
-              icon={<Calendar size={12} />}
-              label="Registered"
-              value={new Date(customer.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-            />
-
-            {(trialStart || licenseStart) && (
-              <DateRow
-                icon={<CheckCircle size={12} className="text-blue-500" />}
-                label="Plan Start"
-                value={(trialStart || licenseStart).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-              />
-            )}
-
-            {trialEnd && customer.plan === 'trial' && (
-              <DateRow
-                icon={<Clock size={12} className="text-amber-500" />}
-                label="Trial Ends"
-                value={trialEnd.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                highlight={customer.days_remaining <= 3}
-              />
-            )}
-
-            {validTill && customer.plan !== 'trial' && customer.plan !== 'free' && (
-              <DateRow
-                icon={customer.is_expired
-                  ? <AlertTriangle size={12} className="text-red-500" />
-                  : <CheckCircle size={12} className="text-emerald-500" />
-                }
-                label="Expires On"
-                value={validTill.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                highlight={customer.is_expired || customer.days_remaining <= 7}
-                expired={customer.is_expired}
-              />
-            )}
-
-            {customer.days_remaining !== null && !customer.is_expired && customer.plan !== 'free' && (
-              <div className="mt-2 pt-2 border-t border-slate-200">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[9px] text-slate-400 font-bold uppercase">Days Remaining</span>
-                  <span className={`text-[10px] font-black ${daysLabel.color}`}>{customer.days_remaining} days</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-1.5">
-                  <div
-                    className={`h-1.5 rounded-full transition-all ${
-                      customer.days_remaining <= 3 ? 'bg-red-500' :
-                      customer.days_remaining <= 7 ? 'bg-orange-500' :
-                      customer.days_remaining <= 15 ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`}
-                    style={{ width: `${Math.min(100, (customer.days_remaining / 30) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Contact Info */}
-          <div className="space-y-1.5">
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Contact</p>
-            <div className="flex items-center gap-2 text-[10px] text-slate-600">
-              <User size={11} className="text-slate-400" /> {customer.owner_name}
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-slate-600">
-              <Phone size={11} className="text-slate-400" /> {customer.phone}
-            </div>
-            {customer.city && (
-              <div className="flex items-center gap-2 text-[10px] text-slate-600">
-                <MapPin size={11} className="text-slate-400" /> {customer.city}
-              </div>
-            )}
-          </div>
+        {/* Tabs */}
+        <div className="flex border-b border-slate-100">
+          <button
+            onClick={() => handleTabClick('details')}
+            className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wide transition-all ${
+              activeTab === 'details'
+                ? 'text-indigo-600 border-b-2 border-indigo-600'
+                : 'text-slate-400 hover:text-slate-600'
+            }`}>
+            Details
+          </button>
+          <button
+            onClick={() => handleTabClick('payments')}
+            className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wide flex items-center justify-center gap-1 transition-all ${
+              activeTab === 'payments'
+                ? 'text-indigo-600 border-b-2 border-indigo-600'
+                : 'text-slate-400 hover:text-slate-600'
+            }`}>
+            <Receipt size={11} /> Payments
+          </button>
         </div>
+
+        {/* Details Tab */}
+        {activeTab === 'details' && (
+          <div className="p-5 space-y-4">
+            {/* Plan + Status */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${planColors[customer.plan] || planColors.none}`}>
+                {customer.plan}
+              </span>
+              <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${customer.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                {customer.is_active ? 'Active' : 'Blocked'}
+              </span>
+              {daysLabel && (
+                <span className={`text-[10px] font-bold ${daysLabel.color}`}>
+                  • {daysLabel.text}
+                </span>
+              )}
+            </div>
+
+            {/* Feature 4: Grace Period Banner */}
+            {customer.is_expired && graceRemaining !== null && (
+              <div>
+                {graceRemaining > 0 ? (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-orange-700 mb-1.5">
+                      ⚠️ Grace Period: {graceRemaining} days remaining — customer still has access
+                    </p>
+                    <div className="w-full bg-orange-100 rounded-full h-1.5">
+                      <div
+                        className="h-1.5 rounded-full bg-orange-400 transition-all"
+                        style={{ width: `${Math.max(0, Math.min(100, (graceRemaining / graceTotalDays) * 100))}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[8px] text-orange-400">0d</span>
+                      <span className="text-[8px] text-orange-400">{graceTotalDays}d total</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-red-700">
+                      🚫 Grace Period Expired — access blocked
+                    </p>
+                    <div className="w-full bg-red-100 rounded-full h-1.5 mt-1.5">
+                      <div className="h-1.5 rounded-full bg-red-400 w-full" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Subscription Dates */}
+            <div className="bg-slate-50 rounded-xl p-4 space-y-2.5">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Subscription Dates</p>
+
+              <DateRow
+                icon={<Calendar size={12} />}
+                label="Registered"
+                value={new Date(customer.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              />
+
+              {(trialStart || licenseStart) && (
+                <DateRow
+                  icon={<CheckCircle size={12} className="text-blue-500" />}
+                  label="Plan Start"
+                  value={(trialStart || licenseStart).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                />
+              )}
+
+              {trialEnd && customer.plan === 'trial' && (
+                <DateRow
+                  icon={<Clock size={12} className="text-amber-500" />}
+                  label="Trial Ends"
+                  value={trialEnd.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  highlight={customer.days_remaining <= 3}
+                />
+              )}
+
+              {validTill && customer.plan !== 'trial' && customer.plan !== 'free' && (
+                <DateRow
+                  icon={customer.is_expired
+                    ? <AlertTriangle size={12} className="text-red-500" />
+                    : <CheckCircle size={12} className="text-emerald-500" />
+                  }
+                  label="Expires On"
+                  value={validTill.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  highlight={customer.is_expired || customer.days_remaining <= 7}
+                  expired={customer.is_expired}
+                />
+              )}
+
+              {customer.days_remaining !== null && !customer.is_expired && customer.plan !== 'free' && (
+                <div className="mt-2 pt-2 border-t border-slate-200">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase">Days Remaining</span>
+                    <span className={`text-[10px] font-black ${daysLabel.color}`}>{customer.days_remaining} days</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${
+                        customer.days_remaining <= 3 ? 'bg-red-500' :
+                        customer.days_remaining <= 7 ? 'bg-orange-500' :
+                        customer.days_remaining <= 15 ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (customer.days_remaining / 30) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Contact Info */}
+            <div className="space-y-1.5">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Contact</p>
+              <div className="flex items-center gap-2 text-[10px] text-slate-600">
+                <User size={11} className="text-slate-400" /> {customer.owner_name}
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-slate-600">
+                <Phone size={11} className="text-slate-400" /> {customer.phone}
+              </div>
+              {customer.city && (
+                <div className="flex items-center gap-2 text-[10px] text-slate-600">
+                  <MapPin size={11} className="text-slate-400" /> {customer.city}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Payments Tab */}
+        {activeTab === 'payments' && (
+          <div className="p-5">
+            {paymentsLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <RefreshCw size={20} className="animate-spin text-indigo-400" />
+              </div>
+            ) : payments.length === 0 ? (
+              <div className="text-center py-10">
+                <Receipt className="mx-auto text-slate-300 mb-2" size={32} />
+                <p className="text-slate-400 text-[10px] font-bold">No payments yet</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="text-left text-slate-400 text-[9px] uppercase tracking-wider border-b border-slate-100">
+                    <tr>
+                      <th className="pb-2">Date</th>
+                      <th className="pb-2">Plan</th>
+                      <th className="pb-2">Amount</th>
+                      <th className="pb-2">Status</th>
+                      <th className="pb-2 text-right">Invoice</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {payments.map((p) => (
+                      <tr key={p.id} className="text-[10px] hover:bg-slate-50/80">
+                        <td className="py-2 text-slate-500">
+                          {new Date(p.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                        </td>
+                        <td className="py-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${
+                            p.plan === 'premium' ? 'bg-emerald-100 text-emerald-700' :
+                            p.plan === 'basic' ? 'bg-blue-100 text-blue-700' :
+                            'bg-slate-100 text-slate-500'
+                          }`}>{p.plan}</span>
+                        </td>
+                        <td className="py-2 font-black text-slate-800">₹{p.amount / 100}</td>
+                        <td className="py-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${statusBadge(p.status)}`}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="py-2 text-right">
+                          {p.pdf_available && p.invoice_id ? (
+                            <button
+                              onClick={() => downloadInvoice(p.invoice_id, p.invoice_number)}
+                              className="p-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100"
+                              title="Download PDF">
+                              <Download size={12} />
+                            </button>
+                          ) : (
+                            <span className="text-slate-300 text-[9px]">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="p-4 border-t border-slate-100 flex gap-2">
@@ -185,14 +508,12 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
               customer.is_active
                 ? 'border-red-200 text-red-500 hover:bg-red-50'
                 : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-            }`}
-          >
+            }`}>
             {customer.is_active ? 'Block' : 'Unblock'}
           </button>
           <button
-            onClick={() => { onUpgrade(customer.id); onClose(); }}
-            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-indigo-700 transition-all"
-          >
+            onClick={() => { onClose(); openUpgradeModal(customer); }}
+            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-indigo-700 transition-all">
             Upgrade / Extend
           </button>
         </div>
@@ -215,6 +536,139 @@ function DateRow({ icon, label, value, highlight, expired }) {
   )
 }
 
+// ─── Expiry Warning Section ───────────────────────────────────────────────────
+function ExpiryWarningSection({ headers, openUpgradeModal }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchExpiring = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/admin/expiring-soon?days=7`, { headers })
+        setData(res.data)
+      } catch (err) {
+        console.error('Failed to fetch expiring soon', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchExpiring()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="mt-4 flex items-center gap-2 text-slate-400 text-[10px]">
+        <RefreshCw size={12} className="animate-spin" /> Loading expiry data...
+      </div>
+    )
+  }
+
+  if (!data) return null
+
+  const expiringSoon = data.expiring_soon || []
+  const expiredGrace = data.expired_in_grace || []
+
+  const planBadge = (plan) => {
+    const map = {
+      premium: 'bg-emerald-100 text-emerald-700',
+      basic: 'bg-blue-100 text-blue-700',
+      trial: 'bg-amber-100 text-amber-700',
+    }
+    return map[plan] || 'bg-slate-100 text-slate-500'
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      {/* Expiring Soon */}
+      <div className="bg-white rounded-xl shadow-sm border border-amber-200/60 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle size={14} className="text-amber-500" />
+          <h3 className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">Expiring Soon (7 days)</h3>
+          {expiringSoon.length > 0 && (
+            <span className="ml-auto bg-amber-100 text-amber-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+              {expiringSoon.length}
+            </span>
+          )}
+        </div>
+
+        {expiringSoon.length === 0 ? (
+          <p className="text-emerald-600 text-[10px] font-bold">✓ No expiring subscriptions</p>
+        ) : (
+          <div className="space-y-1.5">
+            {expiringSoon.map((c) => (
+              <div key={c.customer_id} className="flex items-center justify-between p-2 bg-amber-50/50 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-700 text-[10px] truncate">{c.business_name}</p>
+                  <p className="text-[9px] text-slate-400 truncate">{c.email}</p>
+                </div>
+                <div className="flex items-center gap-2 ml-2 shrink-0">
+                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${planBadge(c.plan)}`}>
+                    {c.plan}
+                  </span>
+                  <span className="text-[9px] font-bold text-amber-600">
+                    {c.days_remaining !== null ? `${c.days_remaining}d left` : '—'}
+                  </span>
+                  <button
+                    onClick={() => openUpgradeModal({
+                      id: c.customer_id,
+                      business_name: c.business_name,
+                      plan: c.plan,
+                      valid_till: c.valid_till,
+                    })}
+                    className="bg-amber-500 text-white px-2 py-0.5 rounded text-[9px] font-bold hover:bg-amber-600 transition-all">
+                    Extend
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Expired in Grace Period */}
+      {expiredGrace.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-red-200/60 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldAlert size={14} className="text-red-500" />
+            <h3 className="text-[10px] font-bold text-red-700 uppercase tracking-widest">Expired — Grace Period</h3>
+            <span className="ml-auto bg-red-100 text-red-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+              {expiredGrace.length}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {expiredGrace.map((c) => (
+              <div key={c.customer_id} className="flex items-center justify-between p-2 bg-red-50/50 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-700 text-[10px] truncate">{c.business_name}</p>
+                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${planBadge(c.plan)}`}>
+                    {c.plan}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 ml-2 shrink-0">
+                  <span className={`text-[9px] font-bold ${c.grace_remaining > 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                    {c.grace_remaining > 0 ? `Grace: ${c.grace_remaining}d left` : 'Grace Expired'}
+                  </span>
+                  <button
+                    onClick={() => openUpgradeModal({
+                      id: c.customer_id,
+                      business_name: c.business_name,
+                      plan: c.plan,
+                      valid_till: c.valid_till,
+                    })}
+                    className="bg-red-500 text-white px-2 py-0.5 rounded text-[9px] font-bold hover:bg-red-600 transition-all">
+                    Renew
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Dashboard Main Component ─────────────────────────────────────────────────
 function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview')
   const [stats, setStats] = useState(null)
@@ -226,11 +680,20 @@ function Dashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [upgradeModal, setUpgradeModal] = useState({ open: false, customer: null, plan: 'basic', months: 1 })
   const navigate = useNavigate()
 
-  // JWT Token Fetch करा
   const token = localStorage.getItem('admin_token')
   const headers = { 'Authorization': `Bearer ${token}` }
+
+  const openUpgradeModal = (customer) => {
+    setUpgradeModal({
+      open: true,
+      customer,
+      plan: customer.plan === 'premium' ? 'premium' : 'basic',
+      months: 1,
+    })
+  }
 
   const fetchData = async () => {
     if (!token) { navigate('/admin/login'); return; }
@@ -268,15 +731,6 @@ function Dashboard() {
     } catch (err) { alert("Failed") }
   }
 
-  const manualUpgrade = async (id) => {
-    const months = window.prompt("Months?", "12")
-    if (!months) return
-    try {
-      await axios.post(`${API_URL}/api/admin/customers/${id}/upgrade?plan=premium&months=${months}`, {}, { headers })
-      fetchData()
-    } catch (err) { alert("Failed") }
-  }
-
   useEffect(() => {
     fetchData()
   }, [])
@@ -285,23 +739,33 @@ function Dashboard() {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-slate-400 uppercase tracking-widest text-xs">Loading Dashboard...</div>
   }
 
-  const filteredCustomers = customers.filter(c => 
+  const filteredCustomers = customers.filter(c =>
     c.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row text-[11px]">
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        upgradeModal={upgradeModal}
+        setUpgradeModal={setUpgradeModal}
+        headers={headers}
+        fetchData={fetchData}
+      />
+
       {/* Customer Detail Modal */}
       {selectedCustomer && (
         <CustomerDetailModal
           customer={selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
-          onUpgrade={(id) => manualUpgrade(id)}
+          onUpgrade={(id) => openUpgradeModal(customers.find(c => c.id === id) || selectedCustomer)}
           onToggleStatus={(id) => toggleStatus(id)}
           headers={headers}
+          openUpgradeModal={(c) => { setSelectedCustomer(null); openUpgradeModal(c); }}
         />
       )}
+
       {/* Mobile Header */}
       <div className="lg:hidden bg-white border-b border-slate-200 p-2 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-1.5">
@@ -341,12 +805,12 @@ function Dashboard() {
       {/* Main Content */}
       <div className="flex-1 p-3 md:p-5 overflow-y-auto">
         <div className="max-w-4xl mx-auto">
-          
+
           <header className="flex justify-between items-center mb-4">
             <h1 className="text-sm font-black text-slate-900 uppercase tracking-widest">
-              {activeTab === 'overview' ? 'Dashboard' : 
-               activeTab === 'customers' ? 'Customers' : 
-               activeTab === 'invoices' ? 'Invoices' : 
+              {activeTab === 'overview' ? 'Dashboard' :
+               activeTab === 'customers' ? 'Customers' :
+               activeTab === 'invoices' ? 'Invoices' :
                activeTab === 'analytics' ? 'Analytics' :
                activeTab === 'promos' ? 'Promo Codes' :
                activeTab === 'settings' ? 'Settings' :
@@ -365,7 +829,7 @@ function Dashboard() {
                 <StatCard title="Total" value={stats?.total_customers} icon={<Users/>} color="blue" />
                 <StatCard title="Trials" value={stats?.active_trials} icon={<Clock/>} color="amber" />
                 <StatCard title="Premium" value={stats?.premium_plan} icon={<Zap/>} color="emerald" />
-                <StatCard title="Revenue" value={`₹${(stats?.revenue_total / 100).toLocaleString()}`} icon={<Banknote/>} color="indigo" />
+                <StatCard title="Revenue" value={`₹${((stats?.revenue_total || 0) / 100).toLocaleString()}`} icon={<Banknote/>} color="indigo" />
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -396,10 +860,13 @@ function Dashboard() {
                   </div>
                   <div className="text-center">
                     <p className="text-indigo-200 text-[9px] uppercase tracking-widest font-bold mb-0.5">ARPU</p>
-                    <p className="text-xl font-black">₹{stats?.arpu / 100}</p>
+                    <p className="text-xl font-black">₹{(stats?.arpu || 0) / 100}</p>
                   </div>
                 </div>
               </div>
+
+              {/* Feature 3: Expiry Warning Section */}
+              <ExpiryWarningSection headers={headers} openUpgradeModal={openUpgradeModal} />
             </>
           )}
 
@@ -407,9 +874,9 @@ function Dashboard() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/50 p-4">
               <div className="mb-4 relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
-                <input 
-                  type="text" 
-                  placeholder="Search..." 
+                <input
+                  type="text"
+                  placeholder="Search..."
                   className="w-full bg-slate-50 border border-slate-200 p-1.5 pl-8 rounded-lg focus:outline-none focus:border-indigo-500 text-[10px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -490,7 +957,7 @@ function Dashboard() {
                           <td className="py-2.5 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <button
-                                onClick={(e) => { e.stopPropagation(); manualUpgrade(c.id); }}
+                                onClick={(e) => { e.stopPropagation(); openUpgradeModal(c); }}
                                 className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-bold hover:bg-indigo-600 hover:text-white uppercase text-[9px]"
                               >
                                 Upgrade
@@ -580,7 +1047,7 @@ function Dashboard() {
                         <td className="py-2 text-right">
                           <div className="flex items-center justify-end gap-1">
                             {inv.pdf_available && (
-                              <button 
+                              <button
                                 onClick={async () => {
                                   try {
                                     const response = await axios.get(
@@ -605,7 +1072,7 @@ function Dashboard() {
                                 <Download size={12} />
                               </button>
                             )}
-                            <button 
+                            <button
                               className={`p-1 rounded ${inv.is_emailed ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}
                               title={inv.is_emailed ? 'Emailed' : 'Not Emailed'}
                             >
@@ -618,7 +1085,7 @@ function Dashboard() {
                   </tbody>
                 </table>
               </div>
-              
+
               {invoices.length === 0 && (
                 <div className="text-center py-12">
                   <FileText className="mx-auto text-slate-300 mb-3" size={48} />

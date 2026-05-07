@@ -37,6 +37,9 @@ class License(Base):
     license_key = Column(String(500), nullable=False, unique=True)
     plan = Column(String(50), default="trial")  # trial, free, basic, premium
     is_active = Column(Boolean, default=True)
+    is_paused = Column(Boolean, default=False)
+    paused_at = Column(DateTime(timezone=True), nullable=True)
+    pause_days_remaining = Column(Integer, nullable=True)
     trial_start = Column(DateTime(timezone=True))
     trial_end = Column(DateTime(timezone=True))
     valid_till = Column(DateTime(timezone=True))

@@ -53,6 +53,9 @@ def list_customers(
             "license_start": license.created_at.isoformat() if license and license.created_at else None,
             "days_remaining": days_remaining,
             "is_expired": is_expired,
+            "is_paused": license.is_paused if license else False,
+            "paused_at": license.paused_at.isoformat() if license and license.paused_at else None,
+            "pause_days_remaining": license.pause_days_remaining if license else None,
             "created_at": c.created_at.isoformat(),
         })
     return {"total": len(result), "customers": result}
@@ -194,6 +197,228 @@ def get_customer(
             "created_at": p.created_at.isoformat(),
         } for p in payments],
     }
+
+
+@router.post("/customers/{customer_id}/pause")
+def pause_subscription(
+    customer_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """Subscription pause करा — valid_till freeze होतो"""
+    license = db.query(License).filter(
+        License.customer_id == customer_id,
+        License.is_active == True
+    ).first()
+    if not license:
+        raise HTTPException(status_code=404, detail="License not found")
+    if license.plan not in ["basic", "premium"]:
+        raise HTTPException(status_code=400, detail="Only basic/premium plans can be paused")
+    if license.is_paused:
+        raise HTTPException(status_code=400, detail="Subscription already paused")
+
+    now = datetime.now(timezone.utc)
+    vt = license.valid_till
+    if vt and vt.tzinfo is None:
+        vt = vt.replace(tzinfo=timezone.utc)
+
+    days_remaining = max(0, (vt - now).days) if vt else 0
+
+    license.is_paused = True
+    license.paused_at = now
+    license.pause_days_remaining = days_remaining
+    db.commit()
+
+    log = AuditLog(
+        customer_id=customer_id,
+        action="subscription_paused",
+        machine_id=license.machine_id,
+        details=f"paused_at={now.isoformat()}, days_remaining={days_remaining}"
+    )
+    db.add(log)
+    db.commit()
+
+    return {
+        "success": True,
+        "paused_at": now.isoformat(),
+        "days_remaining_frozen": days_remaining,
+    }
+
+
+@router.post("/customers/{customer_id}/resume")
+def resume_subscription(
+    customer_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """Subscription resume करा — frozen days परत मिळतात"""
+    license = db.query(License).filter(
+        License.customer_id == customer_id,
+        License.is_active == True
+    ).first()
+    if not license:
+        raise HTTPException(status_code=404, detail="License not found")
+    if not license.is_paused:
+        raise HTTPException(status_code=400, detail="Subscription is not paused")
+
+    now = datetime.now(timezone.utc)
+    days = license.pause_days_remaining or 0
+    new_valid_till = now + timedelta(days=days)
+
+    from app.services.license import generate_license_key
+    new_key = generate_license_key(
+        customer_id=customer_id,
+        machine_id=license.machine_id,
+        plan=license.plan,
+        valid_till=new_valid_till
+    )
+
+    license.is_paused = False
+    license.valid_till = new_valid_till
+    license.license_key = new_key
+    license.paused_at = None
+    license.pause_days_remaining = None
+    license.last_validated = now
+    db.commit()
+
+    log = AuditLog(
+        customer_id=customer_id,
+        action="subscription_resumed",
+        machine_id=license.machine_id,
+        details=f"resumed_at={now.isoformat()}, new_valid_till={new_valid_till.isoformat()}"
+    )
+    db.add(log)
+    db.commit()
+
+    return {
+        "success": True,
+        "resumed_at": now.isoformat(),
+        "new_valid_till": new_valid_till.isoformat(),
+    }
+
+
+@router.post("/customers/bulk-action")
+def bulk_action(
+    action: str,
+    customer_ids: list,
+    days: int = 7,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """Multiple customers वर एकत्र action — extend/block/unblock"""
+    if action not in ["extend", "block", "unblock"]:
+        raise HTTPException(status_code=400, detail="Invalid action. Use: extend, block, unblock")
+
+    results = {"success": [], "failed": []}
+
+    for cid in customer_ids:
+        try:
+            if action == "extend":
+                license = db.query(License).filter(
+                    License.customer_id == cid,
+                    License.is_active == True
+                ).first()
+                if not license:
+                    results["failed"].append(cid)
+                    continue
+                now = datetime.now(timezone.utc)
+                vt = license.valid_till
+                if vt and vt.tzinfo is None:
+                    vt = vt.replace(tzinfo=timezone.utc)
+                base = max(now, vt) if vt else now
+                new_vt = base + timedelta(days=days)
+                from app.services.license import generate_license_key
+                license.valid_till = new_vt
+                license.license_key = generate_license_key(cid, license.machine_id, license.plan, new_vt)
+                if license.plan == "trial":
+                    te = license.trial_end
+                    if te and te.tzinfo is None:
+                        te = te.replace(tzinfo=timezone.utc)
+                    base_te = max(now, te) if te else now
+                    license.trial_end = base_te + timedelta(days=days)
+                db.commit()
+            elif action in ["block", "unblock"]:
+                customer = db.query(Customer).filter(Customer.id == cid).first()
+                if not customer:
+                    results["failed"].append(cid)
+                    continue
+                customer.is_active = (action == "unblock")
+                db.commit()
+            results["success"].append(cid)
+        except Exception:
+            results["failed"].append(cid)
+
+    return {
+        "action": action,
+        "success_count": len(results["success"]),
+        "failed_count": len(results["failed"]),
+        "results": results,
+    }
+
+
+@router.get("/customers/export-csv")
+def export_customers_csv(
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """Customers list CSV मध्ये export करा"""
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    customers = db.query(Customer).order_by(Customer.created_at.desc()).all()
+    now = datetime.now(timezone.utc)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Business Name", "Owner Name", "Email", "Phone", "City",
+        "Plan", "Status", "Trial Start", "Trial End",
+        "Valid Till", "Days Remaining", "Registered On"
+    ])
+
+    for c in customers:
+        license = db.query(License).filter(
+            License.customer_id == c.id,
+            License.is_active == True
+        ).first()
+
+        days_remaining = ""
+        if license and license.valid_till:
+            vt = license.valid_till
+            if vt.tzinfo is None:
+                vt = vt.replace(tzinfo=timezone.utc)
+            days_remaining = max(0, (vt - now).days)
+
+        def fmt(dt):
+            if not dt:
+                return ""
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.strftime("%d %b %Y")
+
+        writer.writerow([
+            c.business_name,
+            c.owner_name,
+            c.email,
+            c.phone,
+            c.city or "",
+            license.plan if license else "none",
+            "Active" if c.is_active else "Blocked",
+            fmt(license.trial_start) if license else "",
+            fmt(license.trial_end) if license else "",
+            fmt(license.valid_till) if license else "",
+            days_remaining,
+            fmt(c.created_at),
+        ])
+
+    output.seek(0)
+    filename = f"customers_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @router.post("/customers/{customer_id}/extend-trial")

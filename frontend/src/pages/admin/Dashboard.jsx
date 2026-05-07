@@ -29,7 +29,12 @@ import {
   Phone,
   MapPin,
   User,
-  Receipt
+  Receipt,
+  PauseCircle,
+  PlayCircle,
+  Download as DownloadIcon,
+  CheckSquare,
+  Square
 } from 'lucide-react'
 import AnalyticsDashboard from '../analytics/Dashboard'
 import Settings from './Settings'
@@ -183,6 +188,7 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
   const [extendTrialDays, setExtendTrialDays] = useState(null) // null = not showing, 7/14/30 = selected
   const [extendLoading, setExtendLoading] = useState(false)
   const [extendSuccess, setExtendSuccess] = useState('')
+  const [pauseLoading, setPauseLoading] = useState(false)
 
   if (!customer) return null
 
@@ -309,6 +315,15 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
             }`}>
             <Receipt size={11} /> Payments
           </button>
+          <button
+            onClick={() => handleTabClick('timeline')}
+            className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wide flex items-center justify-center gap-1 transition-all ${
+              activeTab === 'timeline'
+                ? 'text-indigo-600 border-b-2 border-indigo-600'
+                : 'text-slate-400 hover:text-slate-600'
+            }`}>
+            <Clock size={11} /> Timeline
+          </button>
         </div>
 
         {/* Details Tab */}
@@ -325,6 +340,11 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
               {daysLabel && (
                 <span className={`text-[10px] font-bold ${daysLabel.color}`}>
                   • {daysLabel.text}
+                </span>
+              )}
+              {customer.is_paused && (
+                <span className="px-2 py-1 rounded-lg text-[10px] font-bold uppercase bg-slate-100 text-slate-600 flex items-center gap-1">
+                  <PauseCircle size={10} /> Paused
                 </span>
               )}
             </div>
@@ -503,9 +523,85 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
           </div>
         )}
 
+        {/* Timeline Tab */}
+        {activeTab === 'timeline' && (
+          <div className="p-5">
+            <div className="relative">
+              {/* Vertical line */}
+              <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-slate-100" />
+              <div className="space-y-4">
+                {/* Registration */}
+                <TimelineItem
+                  color="bg-slate-400"
+                  label="Registered"
+                  date={customer.created_at}
+                  description={`${customer.business_name} joined`}
+                />
+                {/* Trial Start */}
+                {customer.trial_start && (
+                  <TimelineItem
+                    color="bg-amber-400"
+                    label="Trial Started"
+                    date={customer.trial_start}
+                    description="7-day trial activated"
+                  />
+                )}
+                {/* Trial End / Expiry */}
+                {customer.trial_end && (
+                  <TimelineItem
+                    color={new Date(customer.trial_end) < new Date() ? 'bg-red-400' : 'bg-amber-300'}
+                    label="Trial Ends"
+                    date={customer.trial_end}
+                    description={new Date(customer.trial_end) < new Date() ? 'Trial expired' : 'Trial active'}
+                  />
+                )}
+                {/* Valid Till for paid plans */}
+                {customer.valid_till && customer.plan !== 'trial' && customer.plan !== 'free' && (
+                  <TimelineItem
+                    color={customer.is_expired ? 'bg-red-500' : 'bg-emerald-500'}
+                    label={customer.is_paused ? 'Paused' : customer.is_expired ? 'Expired' : 'Active Until'}
+                    date={customer.valid_till}
+                    description={`${customer.plan} plan ${customer.is_paused ? '(paused)' : customer.is_expired ? 'expired' : 'active'}`}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="p-4 border-t border-slate-100 space-y-2">
-          {/* Extend Trial — फक्त trial plan साठी दाखवा */}
+          {/* Pause/Resume — basic/premium only */}
+          {(customer.plan === 'basic' || customer.plan === 'premium') && !customer.is_expired && (
+            <button
+              disabled={pauseLoading}
+              onClick={async () => {
+                const action = customer.is_paused ? 'resume' : 'pause'
+                if (!window.confirm(`${action === 'pause' ? 'Pause' : 'Resume'} subscription for ${customer.business_name}?`)) return
+                setPauseLoading(true)
+                try {
+                  await axios.post(`${API_URL}/api/admin/customers/${customer.id}/${action}`, {}, { headers })
+                  onClose()
+                  onTrialExtended && onTrialExtended() // reuse to refresh
+                } catch (err) {
+                  alert('Failed: ' + (err.response?.data?.detail || err.message))
+                } finally {
+                  setPauseLoading(false)
+                }
+              }}
+              className={`w-full py-2 rounded-lg text-[10px] font-bold uppercase border-2 transition-all flex items-center justify-center gap-1.5 ${
+                customer.is_paused
+                  ? 'border-emerald-300 text-emerald-600 hover:bg-emerald-50'
+                  : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+              } disabled:opacity-50`}
+            >
+              {customer.is_paused
+                ? <><PlayCircle size={12} /> Resume Subscription</>
+                : <><PauseCircle size={12} /> Pause Subscription</>
+              }
+            </button>
+          )}
+
           {customer.plan === 'trial' && (
             <div>
               {extendSuccess ? (
@@ -609,6 +705,25 @@ function DateRow({ icon, label, value, highlight, expired }) {
       <span className={`text-[10px] font-bold ${expired ? 'text-red-500' : highlight ? 'text-orange-500' : 'text-slate-700'}`}>
         {value}
       </span>
+    </div>
+  )
+}
+
+function TimelineItem({ color, label, date, description }) {
+  return (
+    <div className="flex gap-3 items-start pl-1">
+      <div className={`w-5 h-5 rounded-full ${color} flex items-center justify-center shrink-0 z-10 mt-0.5`}>
+        <div className="w-2 h-2 bg-white rounded-full" />
+      </div>
+      <div className="flex-1 pb-1">
+        <div className="flex justify-between items-start">
+          <p className="text-[10px] font-bold text-slate-700">{label}</p>
+          <p className="text-[9px] text-slate-400">
+            {date ? new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+          </p>
+        </div>
+        <p className="text-[9px] text-slate-400 mt-0.5">{description}</p>
+      </div>
     </div>
   )
 }
@@ -758,6 +873,8 @@ function Dashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [upgradeModal, setUpgradeModal] = useState({ open: false, customer: null, plan: 'basic', months: 1 })
+  const [selectedIds, setSelectedIds] = useState([])
+  const [bulkLoading, setBulkLoading] = useState(false)
   const navigate = useNavigate()
 
   const token = localStorage.getItem('admin_token')
@@ -950,7 +1067,8 @@ function Dashboard() {
 
           {activeTab === 'customers' && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200/50 p-4">
-              <div className="mb-4 relative">
+            <div className="mb-4 flex gap-2 items-center">
+              <div className="flex-1 relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
                 <input
                   type="text"
@@ -960,11 +1078,93 @@ function Dashboard() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await axios.get(`${API_URL}/api/admin/customers/export-csv`, {
+                      headers,
+                      responseType: 'blob'
+                    })
+                    const url = window.URL.createObjectURL(new Blob([response.data]))
+                    const link = document.createElement('a')
+                    link.href = url
+                    const date = new Date().toISOString().slice(0,10)
+                    link.setAttribute('download', `customers_${date}.csv`)
+                    document.body.appendChild(link)
+                    link.click()
+                    link.remove()
+                    window.URL.revokeObjectURL(url)
+                  } catch (err) {
+                    alert('Export failed')
+                  }
+                }}
+                className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-[10px] font-bold hover:bg-emerald-100 transition-all shrink-0"
+                title="Export CSV"
+              >
+                <DownloadIcon size={12} /> CSV
+              </button>
+            </div>
+
+            {selectedIds.length > 0 && (
+              <div className="mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
+                <span className="text-[10px] font-bold text-indigo-700">{selectedIds.length} selected</span>
+                <div className="flex gap-1.5 ml-auto">
+                  {[7, 14, 30].map(d => (
+                    <button
+                      key={d}
+                      disabled={bulkLoading}
+                      onClick={async () => {
+                        setBulkLoading(true)
+                        try {
+                          await axios.post(`${API_URL}/api/admin/customers/bulk-action?action=extend&days=${d}`, selectedIds, { headers })
+                          setSelectedIds([])
+                          fetchData()
+                        } catch (err) { alert('Failed') }
+                        finally { setBulkLoading(false) }
+                      }}
+                      className="bg-indigo-600 text-white px-2 py-1 rounded text-[9px] font-bold hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      +{d}d
+                    </button>
+                  ))}
+                  <button
+                    disabled={bulkLoading}
+                    onClick={async () => {
+                      if (!window.confirm(`Block ${selectedIds.length} customers?`)) return
+                      setBulkLoading(true)
+                      try {
+                        await axios.post(`${API_URL}/api/admin/customers/bulk-action?action=block`, selectedIds, { headers })
+                        setSelectedIds([])
+                        fetchData()
+                      } catch (err) { alert('Failed') }
+                      finally { setBulkLoading(false) }
+                    }}
+                    className="bg-red-500 text-white px-2 py-1 rounded text-[9px] font-bold hover:bg-red-600 disabled:opacity-50"
+                  >
+                    Block
+                  </button>
+                  <button
+                    onClick={() => setSelectedIds([])}
+                    className="text-slate-400 px-2 py-1 rounded text-[9px] font-bold hover:text-slate-600"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
 
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="text-left text-slate-400 text-[9px] uppercase tracking-wider border-b border-slate-50">
                     <tr>
+                      <th className="pb-2 w-6">
+                        <button onClick={() => setSelectedIds(selectedIds.length === filteredCustomers.length ? [] : filteredCustomers.map(c => c.id))}>
+                          {selectedIds.length === filteredCustomers.length && filteredCustomers.length > 0
+                            ? <CheckSquare size={12} className="text-indigo-600" />
+                            : <Square size={12} className="text-slate-300" />
+                          }
+                        </button>
+                      </th>
                       <th className="pb-2">Business</th>
                       <th className="pb-2">Joined</th>
                       <th className="pb-2">Plan</th>
@@ -992,6 +1192,16 @@ function Dashboard() {
                           className="text-[10px] hover:bg-slate-50/80 cursor-pointer transition-colors"
                           onClick={() => setSelectedCustomer(c)}
                         >
+                          <td className="py-2.5" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setSelectedIds(prev => 
+                              prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id]
+                            )}>
+                              {selectedIds.includes(c.id)
+                                ? <CheckSquare size={12} className="text-indigo-600" />
+                                : <Square size={12} className="text-slate-300" />
+                              }
+                            </button>
+                          </td>
                           <td className="py-2.5 font-bold text-slate-700">
                             {c.business_name}
                             <br/>
@@ -1019,6 +1229,7 @@ function Dashboard() {
                                     {isExpired ? 'Expired' : `${daysRemaining}d left`}
                                   </p>
                                 )}
+                                {c.is_paused && <p className="text-[9px] font-bold text-slate-500">⏸ Paused</p>}
                               </div>
                             ) : (
                               <span className="text-slate-300">—</span>

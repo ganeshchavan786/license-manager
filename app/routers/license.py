@@ -71,18 +71,20 @@ def create_order(req: PaymentRequest, db: Session = Depends(get_db)):
     from app.services.razorpay import get_razorpay_client
     from app.services.license import verify_license_key
     
-    # DB मधून Razorpay client घ्या (UI मधून set केलेल्या keys)
     client = get_razorpay_client(db)
     
-    # License key वरून license शोधा — exact match किंवा JWT decode
+    # URL encoding fix: spaces → + (JWT token मध्ये + signs असतात)
+    fixed_key = req.license_key.replace(" ", "+")
+    
+    # Exact match
     license = db.query(License).filter(
-        License.license_key == req.license_key,
+        License.license_key == fixed_key,
         License.is_active == True
     ).first()
     
-    # Exact match नाही तर JWT decode करून customer_id वरून शोधा
+    # JWT decode करून customer_id वरून शोधा
     if not license:
-        payload = verify_license_key(req.license_key)
+        payload = verify_license_key(fixed_key)
         if payload:
             customer_id = payload.get("customer_id")
             if customer_id:
@@ -127,11 +129,21 @@ def verify_payment(req: PaymentVerify, db: Session = Depends(get_db)):
     if not is_valid:
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
-    # License शोधा
+    # License शोधा — URL encoding fix
+    fixed_key = req.license_key.replace(" ", "+")
     license = db.query(License).filter(
-        License.license_key == req.license_key,
+        License.license_key == fixed_key,
         License.is_active == True
     ).first()
+    if not license:
+        # JWT decode करून शोधा
+        from app.services.license import verify_license_key
+        payload = verify_license_key(fixed_key)
+        if payload:
+            license = db.query(License).filter(
+                License.customer_id == payload.get("customer_id"),
+                License.is_active == True
+            ).first()
     if not license:
         raise HTTPException(status_code=404, detail="License not found")
 

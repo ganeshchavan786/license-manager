@@ -96,25 +96,31 @@ ok "Node dependencies installed"
 # ── Step 7: PM2 services ──────────────────────────────────
 step "7. PM2 services"
 
+# Install serve globally if not found
+if ! command -v serve &>/dev/null; then
+    npm install -g serve --silent
+fi
+
+SERVE_PATH=$(which serve)
+
 # Stop existing
 pm2 stop all 2>/dev/null || true
 pm2 delete all 2>/dev/null || true
 
 # Start backend
-pm2 start venv/bin/uvicorn \
+pm2 start $APP_DIR/venv/bin/uvicorn \
   --name backend \
   --interpreter none \
   -- app.main:app --host 0.0.0.0 --port 8661 --workers 2
 
 # Start frontend
-pm2 start serve \
+pm2 start $SERVE_PATH \
   --name frontend \
   --interpreter none \
-  -- -s dist -l 3441 --no-clipboard \
-  --cwd $APP_DIR/frontend
+  -- -s $APP_DIR/frontend/dist -l 3441 --no-clipboard
 
 # Start proxy
-pm2 start proxy-server.js --name proxy
+pm2 start $APP_DIR/proxy-server.js --name proxy
 
 sleep 3
 ok "PM2 services started"

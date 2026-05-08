@@ -98,6 +98,15 @@ def validate_license(db: Session, machine_id: str, license_key: str, ip: str = N
     if not license:
         return {"valid": False, "reason": "License not found"}
 
+    # Customer blocked आहे का check करा
+    customer = db.query(Customer).filter(Customer.id == license.customer_id).first()
+    if not customer or not customer.is_active:
+        return {
+            "valid": False,
+            "reason": "blocked",
+            "support_required": True,
+        }
+
     # Expiry check करा
     valid_till = license.valid_till
     if valid_till.tzinfo is None:

@@ -23,6 +23,9 @@ class LicenseStatusResponse(BaseModel):
     encrypted_cache: str | None = None
     reason: str | None = None
     customer_id: str | None = None
+    support_required: bool = False
+    # Expire नंतर basic features
+    basic_features: list = ["view_attendance", "view_employees"]
 
 
 @router.post("/validate", response_model=LicenseStatusResponse)
@@ -37,7 +40,8 @@ def validate(req: ValidateRequest, request: Request, db: Session = Depends(get_d
     if not result["valid"]:
         return LicenseStatusResponse(
             valid=False,
-            reason=result.get("reason", "Invalid license")
+            reason=result.get("reason", "Invalid license"),
+            support_required=result.get("support_required", False)
         )
 
     return LicenseStatusResponse(

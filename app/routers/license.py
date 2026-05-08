@@ -22,6 +22,7 @@ class LicenseStatusResponse(BaseModel):
     valid_till: str | None = None
     encrypted_cache: str | None = None
     reason: str | None = None
+    customer_id: str | None = None
 
 
 @router.post("/validate", response_model=LicenseStatusResponse)
@@ -47,6 +48,7 @@ def validate(req: ValidateRequest, request: Request, db: Session = Depends(get_d
         days_remaining=result.get("days_remaining"),
         valid_till=result.get("valid_till"),
         encrypted_cache=result["encrypted_cache"],
+        customer_id=result.get("customer_id"),
     )
 
 

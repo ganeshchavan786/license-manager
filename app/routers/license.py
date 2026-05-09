@@ -24,7 +24,7 @@ class LicenseStatusResponse(BaseModel):
     reason: str | None = None
     customer_id: str | None = None
     support_required: bool = False
-    # Expire नंतर basic features
+    is_expired: bool = False
     basic_features: list = ["view_attendance", "view_employees"]
 
 
@@ -53,6 +53,7 @@ def validate(req: ValidateRequest, request: Request, db: Session = Depends(get_d
         valid_till=result.get("valid_till"),
         encrypted_cache=result["encrypted_cache"],
         customer_id=result.get("customer_id"),
+        is_expired=result.get("is_expired", False),
     )
 
 

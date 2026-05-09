@@ -113,11 +113,12 @@ def validate_license(db: Session, machine_id: str, license_key: str, ip: str = N
         valid_till = valid_till.replace(tzinfo=timezone.utc)
 
     if valid_till < now:
-        # Trial संपली — free plan ला downgrade करा
+        # Trial संपली — free plan ला downgrade करू नका
+        # HRMS ला READ_ONLY state मिळेल
         if license.plan == "trial":
-            license.plan = "free"
-            license.valid_till = now + timedelta(days=365 * 10)  # Free is forever
-            db.commit()
+            # Trial expired — valid_till past आहे, plan trial च ठेवा
+            # validate_license "valid: true" return करेल पण features limited असतील
+            pass
 
     # Last validated update करा
     license.last_validated = now
@@ -144,11 +145,16 @@ def validate_license(db: Session, machine_id: str, license_key: str, ip: str = N
 
     # Days remaining
     days_remaining = None
+    is_expired = False
     if license.plan == "trial":
         trial_end = license.trial_end
         if trial_end.tzinfo is None:
             trial_end = trial_end.replace(tzinfo=timezone.utc)
         days_remaining = max(0, (trial_end - now).days)
+        is_expired = trial_end < now
+    elif license.plan in ["basic", "premium"]:
+        is_expired = valid_till < now
+        days_remaining = max(0, (valid_till - now).days)
 
     # Cache साठी encrypted data
     cache_data = {
@@ -172,6 +178,7 @@ def validate_license(db: Session, machine_id: str, license_key: str, ip: str = N
         "valid_till": license.valid_till.isoformat(),
         "encrypted_cache": encrypted_cache,
         "customer_id": license.customer_id,
+        "is_expired": is_expired,
     }
 
 

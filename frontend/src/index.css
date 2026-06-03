@@ -11,8 +11,80 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f5f5f5;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* ─── Global Dark Mode Overrides ─── */
+.dark body {
+  background-color: #0b0f19 !important;
+  color: #f8fafc !important;
+}
+
+.dark .min-h-screen.bg-\[\#F8FAFC\] {
+  background-color: #0b0f19 !important;
+}
+
+.dark div.bg-white,
+.dark header.bg-white,
+.dark form.bg-white,
+.dark nav.bg-white,
+.dark .bg-white {
+  background-color: #111827 !important; /* Gray 900 */
+  color: #f8fafc !important;
+}
+
+.dark .border-slate-200,
+.dark .border-slate-100,
+.dark .border-slate-200\/50,
+.dark .divide-slate-50 > * {
+  border-color: #1f2937 !important; /* Gray 800 */
+  divide-color: #1f2937 !important;
+}
+
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #9ca3af !important; /* Gray 400 */
+}
+
+.dark .bg-slate-50 {
+  background-color: #1f2937 !important;
+}
+
+.dark tbody tr:hover,
+.dark .hover\:bg-slate-50\/80:hover,
+.dark .hover\:bg-slate-50:hover {
+  background-color: #1f2937 !important;
+}
+
+.dark table thead,
+.dark thead {
+  background-color: #111827 !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+  color: #ffffff !important;
+}
+
+.dark input::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Modal specific override */
+.dark .bg-slate-900\/40 {
+  background-color: rgba(0, 0, 0, 0.6) !important;
 }

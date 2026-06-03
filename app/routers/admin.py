@@ -47,6 +47,7 @@ def list_customers(
             "city": c.city,
             "is_active": c.is_active,
             "plan": license.plan if license else "none",
+            "machine_id": license.machine_id if license else "—",
             "valid_till": license.valid_till.isoformat() if license and license.valid_till else None,
             "trial_start": license.trial_start.isoformat() if license and license.trial_start else None,
             "trial_end": license.trial_end.isoformat() if license and license.trial_end else None,
@@ -534,6 +535,40 @@ def toggle_customer_status(
     db.commit()
     
     return {"success": True, "is_active": customer.is_active}
+
+
+@router.post("/customers/{customer_id}/reset-machine")
+def reset_machine_id(
+    customer_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin)
+):
+    """Customer चा machine_id reset करतो जेणेकरून नवीन VPS वर बाइंड करता येईल"""
+    import uuid
+    license = db.query(License).filter(
+        License.customer_id == customer_id,
+        License.is_active == True
+    ).first()
+    
+    if not license:
+        raise HTTPException(status_code=404, detail="License not found")
+        
+    # Generate unique dummy machine ID to bypass unique constraint
+    old_mid = license.machine_id
+    license.machine_id = f"reset-{uuid.uuid4()}"
+    db.commit()
+    
+    # log event
+    log = AuditLog(
+        customer_id=customer_id,
+        action="machine_id_reset",
+        details=f"old_machine_id={old_mid}"
+    )
+    db.add(log)
+    db.commit()
+    
+    return {"success": True, "message": "Machine ID reset successfully."}
+
 
 
 @router.get("/stats")

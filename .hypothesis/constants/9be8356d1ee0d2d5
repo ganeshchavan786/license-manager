@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\services\license.py
+# hypothesis_version: 6.152.4
+
+['*', 'License not found', 'basic', 'blocked', 'customer_id', 'days_remaining', 'encrypted_cache', 'features', 'grace_period_days', 'is_expired', 'issued_at', 'last_online', 'license_key', 'license_upgraded', 'license_validated', 'machine_id', 'plan', 'premium', 'reason', 'support_required', 'trial', 'valid', 'valid_till']

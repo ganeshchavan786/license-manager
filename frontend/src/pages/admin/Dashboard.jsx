@@ -34,7 +34,9 @@ import {
   PlayCircle,
   Download as DownloadIcon,
   CheckSquare,
-  Square
+  Square,
+  Sun,
+  Moon
 } from 'lucide-react'
 import AnalyticsDashboard from '../analytics/Dashboard'
 import Settings from './Settings'
@@ -456,6 +458,19 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
                 </div>
               )}
             </div>
+
+            {/* Identifiers */}
+            <div className="space-y-1.5 pt-2 border-t border-slate-100">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Identifiers</p>
+              <div className="flex justify-between items-center text-[10px] text-slate-600">
+                <span className="font-bold">Customer ID:</span>
+                <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded select-all">{customer.id}</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px] text-slate-600">
+                <span className="font-bold">Machine ID:</span>
+                <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded select-all">{customer.machine_id || "—"}</span>
+              </div>
+            </div>
           </div>
         )}
 
@@ -673,6 +688,25 @@ function CustomerDetailModal({ customer, onClose, onUpgrade, onToggleStatus, hea
             </div>
           )}
 
+          {customer.machine_id && !customer.machine_id.startsWith("reset-") && (
+            <button
+              onClick={async () => {
+                if (!window.confirm(`Are you sure you want to reset the Machine ID lock for ${customer.business_name}?`)) return
+                try {
+                  await axios.post(`${API_URL}/api/admin/customers/${customer.id}/reset-machine`, {}, { headers })
+                  alert("Machine ID reset successfully! The customer can now log in on a new server.")
+                  onClose()
+                  onTrialExtended && onTrialExtended()
+                } catch (err) {
+                  alert('Reset failed: ' + (err.response?.data?.detail || err.message))
+                }
+              }}
+              className="w-full py-2 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 rounded-lg text-[10px] font-bold uppercase hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all mb-2"
+            >
+              Reset Machine ID
+            </button>
+          )}
+
           <div className="flex gap-2">
             <button
               onClick={() => { onToggleStatus(customer.id); onClose(); }}
@@ -875,7 +909,21 @@ function Dashboard() {
   const [upgradeModal, setUpgradeModal] = useState({ open: false, customer: null, plan: 'basic', months: 1 })
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light')
+  }
 
   const token = localStorage.getItem('admin_token')
   const headers = { 'Authorization': `Bearer ${token}` }
@@ -992,6 +1040,18 @@ function Dashboard() {
           <NavItem active={activeTab === 'settings'} icon={<SettingsIcon size={14}/>} label="Settings" onClick={()=>{setActiveTab('settings'); setMobileMenuOpen(false)}} />
         </nav>
 
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          className="mb-3 flex items-center gap-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold text-[10px] uppercase text-left"
+        >
+          {theme === 'light' ? (
+            <><Moon size={14} /> Dark Mode</>
+          ) : (
+            <><Sun size={14} /> Light Theme</>
+          )}
+        </button>
+
         <button onClick={() => { localStorage.removeItem('admin_token'); navigate('/'); }} className="mt-auto flex items-center gap-1.5 text-slate-400 hover:text-red-500 font-bold text-[10px] uppercase">
           <LogOut size={14} /> Logout
         </button>
@@ -1048,14 +1108,22 @@ function Dashboard() {
                   </div>
                 </div>
 
-                <div className="bg-indigo-600 rounded-xl p-5 text-white flex flex-col justify-between shadow-lg shadow-indigo-100">
+                <div className="bg-indigo-600 dark:bg-slate-900 rounded-xl p-5 text-white flex flex-col justify-between shadow-lg shadow-indigo-100 dark:shadow-none border dark:border-slate-800">
                   <div className="mb-4 text-center">
-                    <p className="text-indigo-200 text-[9px] uppercase tracking-widest font-bold mb-0.5">Conversion</p>
-                    <p className="text-3xl font-black">{stats?.conversion_rate}%</p>
+                    <p className="text-indigo-200 dark:text-slate-400 text-[9px] uppercase tracking-widest font-bold mb-2">Conversion Rate</p>
+                    <div className="relative flex items-center justify-center">
+                      <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 100 100">
+                        {/* Background track */}
+                        <circle className="text-indigo-800 dark:text-slate-800" strokeWidth="8" stroke="currentColor" fill="transparent" r="40" cx="50" cy="50"/>
+                        {/* Progress line */}
+                        <circle className="text-white dark:text-indigo-500 transition-all duration-500 ease-out" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * (stats?.conversion_rate || 0)) / 100} strokeLinecap="round" stroke="currentColor" fill="transparent" r="40" cx="50" cy="50"/>
+                      </svg>
+                      <span className="absolute text-sm font-black text-white dark:text-slate-100">{stats?.conversion_rate}%</span>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-indigo-200 text-[9px] uppercase tracking-widest font-bold mb-0.5">ARPU</p>
-                    <p className="text-xl font-black">₹{(stats?.arpu || 0) / 100}</p>
+                  <div className="text-center pt-2 border-t border-indigo-500/50 dark:border-slate-800">
+                    <p className="text-indigo-200 dark:text-slate-400 text-[9px] uppercase tracking-widest font-bold mb-0.5">ARPU</p>
+                    <p className="text-xl font-black text-white dark:text-slate-100">₹{(stats?.arpu || 0) / 100}</p>
                   </div>
                 </div>
               </div>
@@ -1206,6 +1274,12 @@ function Dashboard() {
                             {c.business_name}
                             <br/>
                             <span className="font-normal text-[9px] text-slate-400">{c.email}</span>
+                            <br/>
+                            <div className="flex gap-2 text-[8px] font-mono text-slate-400 dark:text-slate-500 mt-0.5">
+                              <span>CID: {c.id.slice(0, 8)}...</span>
+                              <span>•</span>
+                              <span>MID: {c.machine_id || "—"}</span>
+                            </div>
                           </td>
                           <td className="py-2.5 text-slate-500">
                             {new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}

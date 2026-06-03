@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\routers\license.py
+# hypothesis_version: 6.152.4
+
+[400, 404, 49900, '+', '.', '/create-order', '/license', '/status/{machine_id}', '/validate', '/verify-payment', '=', 'INR', 'Invalid license', 'License', 'License not found', 'amount', 'basic', 'business_name', 'captured', 'currency', 'customer_id', 'days_remaining', 'email', 'encrypted_cache', 'features', 'found', 'free', 'grace_period_days', 'is_expired', 'license_key', 'message', 'new_expiry', 'notes', 'plan', 'premium', 'reason', 'receipt', 'status', 'success', 'support_required', 'unknown', 'valid', 'valid_till', 'view_attendance', 'view_employees']

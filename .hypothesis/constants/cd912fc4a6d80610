@@ -1,0 +1,4 @@
+# file: D:\HR\license-server\app\models\__init__.py
+# hypothesis_version: 6.152.4
+
+[100, 200, 255, 500, 'Customer', 'INR', 'License', 'Payment', 'Subscription', 'admin', 'admin_users', 'apply_leave', 'audit_logs', 'basic', 'created', 'customer', 'customers', 'customers.id', 'email_queue', 'employee', 'export_reports', 'free', 'invoices', 'licenses', 'licenses.id', 'manage_attendance', 'manage_employees', 'manage_leaves', 'manage_loans', 'manage_salary', 'manage_settings', 'manage_team', 'manager', 'metadata', 'payments', 'payments.id', 'pending', 'premium', 'promo_code_usage', 'promo_codes', 'promo_codes.id', 'settings', 'subscriptions', 'team_members', 'trial', 'usage_analytics', 'view_analytics', 'view_dashboard', 'view_employees', 'view_own_attendance', 'view_own_loans', 'view_own_salary', 'view_salary']

@@ -127,11 +127,47 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
     # License info fetch करा
     from app.models import License
+    from app.services.license import generate_license_key
+    
+    # First, look for an exact match
     license = db.query(License).filter(
         License.customer_id == customer.id,
         License.machine_id == req.machine_id,
         License.is_active == True
     ).first()
+
+    # If no exact match, check if there is a reset/cleared license for this customer
+    if not license:
+        reset_license = db.query(License).filter(
+            License.customer_id == customer.id,
+            License.is_active == True
+        ).first()
+        
+        # If the license has been cleared by the admin (starts with "reset-")
+        if reset_license and reset_license.machine_id.startswith("reset-"):
+            # Check if this new machine_id is already in use by another active license
+            another_active = db.query(License).filter(
+                License.machine_id == req.machine_id,
+                License.is_active == True,
+                License.customer_id != customer.id
+            ).first()
+            if another_active:
+                raise HTTPException(
+                    status_code=400,
+                    detail="This computer/VPS is already active with another account. Please contact support."
+                )
+            
+            # Bind the new machine ID and regenerate key
+            reset_license.machine_id = req.machine_id
+            reset_license.license_key = generate_license_key(
+                customer_id=customer.id,
+                machine_id=req.machine_id,
+                plan=reset_license.plan,
+                valid_till=reset_license.valid_till
+            )
+            db.commit()
+            db.refresh(reset_license)
+            license = reset_license
 
     return {
         "access_token": token,

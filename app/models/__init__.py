@@ -33,7 +33,7 @@ class License(Base):
 
     id = Column(String, primary_key=True, default=gen_uuid)
     customer_id = Column(String, ForeignKey("customers.id"), nullable=False)
-    machine_id = Column(String(255), nullable=False, index=True)
+    machine_id = Column(String(255), nullable=False, index=True, unique=True)
     license_key = Column(String(500), nullable=False, unique=True)
     plan = Column(String(50), default="trial")  # trial, free, basic, premium
     is_active = Column(Boolean, default=True)

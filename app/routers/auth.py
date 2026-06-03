@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from app.database import get_db
-from app.models import Customer, AuditLog, AdminUser
+from app.models import Customer, AuditLog, AdminUser, License
 from app.services.auth import hash_password, verify_password, create_access_token
 from app.services.license import create_trial_license
 from app.services.email import send_welcome_email
@@ -58,6 +58,15 @@ def register(req: RegisterRequest, request: Request, db: Session = Depends(get_d
     existing = db.query(Customer).filter(Customer.email == req.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    # ── SECURITY CHECK: Machine ID Lock ──
+    # Check if a customer with the same machine_id has already registered
+    existing_machine = db.query(License).filter(License.machine_id == req.machine_id).first()
+    if existing_machine:
+        raise HTTPException(
+            status_code=400,
+            detail="This computer/VPS is already active with another account. Please contact support."
+        )
 
     # Customer create करा
     customer = Customer(
